@@ -1,0 +1,10 @@
+# Block direct access to anything in this folder (DB, WAL, journals).
+# Only PHP code on the server is supposed to read these files.
+
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>

@@ -1,0 +1,1515 @@
+<!doctype html>
+<html lang="sq">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Arkitektura e Universit · Lidhja</title>
+
+<!-- Fonts come from Google Fonts CDN — no local /fonts/ files needed.
+     This also takes 3 failed requests off the localhost PHP dev server
+     (which is single-threaded and gets overwhelmed when a slow 404 ties
+     up its only worker, causing slides.json to fail to load). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+
+  :root {
+    --navy:        #0a1438;
+    --navy-deep:   #050a1f;
+    --navy-darker: #03061a;
+    --gold:        #e8c98b;
+    --gold-bright: #f3dba1;
+    --gold-soft:   #c9a86a;
+    --cream:       #f5efe1;
+    --cream-dim:   rgba(245, 239, 225, 0.62);
+    --cream-faint: rgba(245, 239, 225, 0.30);
+
+    --display: "Cormorant Garamond", "Apple Garamond", "EB Garamond",
+               "Iowan Old Style", "Hoefler Text", Garamond, Georgia, serif;
+    --body:    "Cormorant Garamond", "Iowan Old Style", "Hoefler Text",
+               Garamond, Georgia, serif;
+    --sans:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+               "Inter", system-ui, sans-serif;
+    --mono:    "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, monospace;
+
+    --ease: cubic-bezier(.2,.7,.2,1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--navy-darker);
+    color: var(--cream);
+    font-family: var(--body);
+    font-size: clamp(14px, 1.05vw, 18px);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    user-select: none;
+    cursor: default;
+  }
+
+  ::selection { background: var(--gold); color: var(--navy-deep); }
+
+  /* ---------- Stage ---------- */
+
+  .stage {
+    position: fixed; inset: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(140% 90% at 50% 110%, #142154 0%, var(--navy-deep) 55%, var(--navy-darker) 100%);
+  }
+
+  /* Video crossfade wrapper — owns the positioning/framing. */
+  .video-stage {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Video element — fills the wrapper. A tiny scale (1.04) crops about
+     2% off each edge to hide thin baked-in black bars that some source
+     .mp4 files have. Small enough to be visually imperceptible. */
+  .bg-video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  .bg-video.active { opacity: 0.55; }
+
+  /* Image variant — no safety-crop scaling; stills don't have the baked
+     baked-in bars that some source .mp4 files do. */
+  .bg-image { transform: none; }
+
+  /* Vignette + grain over video — soft so it doesn't read as "black sides" on a TV. */
+  .stage::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(140% 100% at 50% 50%, transparent 55%, rgba(3,6,26,0.30) 88%, rgba(3,6,26,0.62) 100%),
+      linear-gradient(180deg, rgba(3,6,26,0.20) 0%, transparent 18%, transparent 82%, rgba(3,6,26,0.35) 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .stage::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 1px;
+    mix-blend-mode: overlay;
+    opacity: .25;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  /* When showing a topic slide, drop the heavy vignette over the right
+     frame so the video reads cleanly. */
+  .stage.split::before { opacity: .35; }
+
+  /* On topic slides the video sits as a 16:9 framed panel on the LEFT,
+     centered vertically. Width drives the size; height is derived from
+     the 16:9 aspect ratio so the video fills the frame perfectly. */
+  .stage.split .video-stage {
+    top: 50%;
+    bottom: auto;
+    right: auto;
+    left: 3.5vw;
+    width: 52vw;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    transform: translateY(-50%);
+    border-radius: 4px;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.65),
+      0 0 80px rgba(232,201,139,0.16),
+      inset 0 0 0 1px rgba(232,201,139,0.40);
+  }
+  .stage.split .bg-video.active { opacity: 0.95; }
+
+  /* Decorative gold corner accents on the framed video — sized to
+     match the .video-stage exactly. */
+  .video-frame-overlay {
+    position: absolute;
+    top: 50%;
+    left: 3.5vw;
+    width: 52vw;
+    aspect-ratio: 16 / 9;
+    transform: translateY(-50%);
+    z-index: 4;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .stage.split .video-frame-overlay { opacity: 1; }
+  .video-frame-overlay::before,
+  .video-frame-overlay::after {
+    content: "";
+    position: absolute;
+    width: 48px; height: 48px;
+    border: 1px solid var(--gold);
+  }
+  .video-frame-overlay::before {
+    top: -12px; left: -12px;
+    border-right: none; border-bottom: none;
+  }
+  .video-frame-overlay::after {
+    bottom: -12px; right: -12px;
+    border-left: none; border-top: none;
+  }
+
+  /* Procedural star field — always present, even with no video */
+  .stars {
+    position: absolute; inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .star {
+    position: absolute;
+    width: 2px; height: 2px;
+    border-radius: 50%;
+    background: var(--cream);
+    box-shadow: 0 0 4px rgba(245,239,225,0.6);
+    opacity: 0;
+    animation: twinkle 6s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.08; transform: scale(0.6); }
+    50%      { opacity: 0.85; transform: scale(1); }
+  }
+
+  /* ---------- Chrome (top + bottom + sides) ---------- */
+
+  .chrome {
+    position: absolute; inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .chrome > * { pointer-events: auto; }
+
+  .brand {
+    position: absolute;
+    top: 3.2vh;
+    left: 4vw;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.35rem;
+    letter-spacing: .01em;
+    color: var(--gold);
+  }
+  .brand::after {
+    content: "";
+    display: inline-block;
+    width: 6.5vw; min-width: 60px;
+    height: 1px;
+    background: var(--gold-soft);
+    vertical-align: middle;
+    margin-left: 1.1rem;
+    opacity: .55;
+  }
+
+  /* Brand stays at top-left in every layout; on topic slides it sits
+     naturally above the left-hand video frame, on the same row as the
+     topic eyebrow info. The trailing line is hidden on split slides so
+     it doesn't run into the topic meta. */
+  .stage.split .brand::after { width: 0; opacity: 0; }
+
+  /* On topic slides the eyebrow header above the video already states the
+     section + start year, so we drop those duplicates from the bottom chrome.
+     The year tooltip on the cursor stays — it's a different presentation. */
+  .stage.split #slideLabel,
+  .stage.split #timelineStart { visibility: hidden; }
+
+  .corner-meta {
+    position: absolute;
+    top: 3.6vh;
+    right: 4vw;
+    display: flex;
+    gap: 1.6rem;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  .corner-meta button,
+  .corner-meta a.btn {
+    background: none;
+    border: 1px solid var(--cream-faint);
+    color: var(--cream-dim);
+    font: inherit;
+    letter-spacing: .28em;
+    padding: .5rem .85rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .25s var(--ease);
+  }
+  .corner-meta button:hover,
+  .corner-meta a.btn:hover {
+    color: var(--gold);
+    border-color: var(--gold-soft);
+  }
+  .corner-meta .lang-pill .active { color: var(--gold); }
+
+  .footer-bar {
+    position: absolute;
+    left: 4vw; right: 4vw; bottom: 9vh;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+    z-index: 11;
+  }
+  .footer-bar .count { color: var(--gold); }
+
+  /* ============== TIMELINE ============== */
+
+  .timeline {
+    position: absolute;
+    left: 4vw; right: 4vw; bottom: 2.2vh;
+    z-index: 11;
+    pointer-events: auto;
+    font-family: var(--mono);
+    color: var(--cream-dim);
+  }
+  .timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: .55rem;
+    font-size: .62rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+  }
+  .timeline-head .anchor { color: var(--cream-dim); }
+
+  .timeline-track {
+    position: relative;
+    height: 26px;
+    cursor: pointer;
+  }
+  .timeline-rail {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg,
+      rgba(232,201,139,0) 0%,
+      rgba(232,201,139,0.35) 10%,
+      rgba(232,201,139,0.45) 50%,
+      rgba(232,201,139,0.55) 90%,
+      rgba(232,201,139,0) 100%);
+    transform: translateY(-50%);
+  }
+  .timeline-tick {
+    position: absolute;
+    top: 50%;
+    width: 1px;
+    height: 6px;
+    background: rgba(245,239,225,0.30);
+    transform: translate(-50%, -50%);
+  }
+  .timeline-tick.section-start {
+    height: 14px;
+    background: var(--gold-soft);
+  }
+  .timeline-tick.passed { background: var(--gold-soft); }
+  .timeline-tick.active {
+    height: 18px;
+    background: var(--gold-bright);
+    box-shadow: 0 0 8px rgba(243,219,161,.7);
+  }
+  .timeline-tick:hover {
+    background: var(--gold);
+    height: 12px;
+  }
+
+  /* Section ribbon under the track — shows where each section sits. */
+  .timeline-ribbon {
+    position: relative;
+    height: 14px;
+    margin-top: 6px;
+    display: flex;
+    font-size: .55rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    pointer-events: none;
+  }
+  .timeline-ribbon .seg {
+    flex: 1;
+    border-top: 1px solid var(--cream-faint);
+    padding-top: 4px;
+    text-align: center;
+  }
+  .timeline-ribbon .seg.active { color: var(--gold); border-color: var(--gold-soft); }
+  .timeline-ribbon .seg + .seg { margin-left: 1px; }
+
+  /* Cursor dot — slides smoothly with current */
+  .timeline-cursor {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold-bright);
+    transform: translate(-50%, -50%);
+    box-shadow:
+      0 0 0 4px rgba(232,201,139,0.18),
+      0 0 18px rgba(243,219,161,0.7);
+    pointer-events: none;
+  }
+
+  /* Year tooltip — small italic label floating above the cursor dot. */
+  .timeline-current {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: .78rem;
+    letter-spacing: .01em;
+    color: var(--gold);
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  /* Small connector line from label down to the dot. */
+  .timeline-current::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 1px;
+    height: 6px;
+    margin-top: 2px;
+    background: var(--gold-soft);
+    transform: translateX(-50%);
+  }
+
+  /* Arrow controls */
+  .nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 64px; height: 64px;
+    display: grid; place-items: center;
+    background: rgba(5,10,31,0.35);
+    border: 1px solid var(--cream-faint);
+    border-radius: 50%;
+    color: var(--cream);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transition: opacity .35s var(--ease), transform .35s var(--ease), border-color .35s var(--ease);
+    z-index: 12;
+  }
+  .stage:hover .nav-arrow { opacity: .55; }
+  .nav-arrow:hover { opacity: 1; border-color: var(--gold-soft); color: var(--gold); }
+  .nav-arrow.left  { left: 2vw; }
+  .nav-arrow.right { right: 2vw; }
+  .nav-arrow:active { transform: translateY(-50%) scale(.94); }
+  .nav-arrow svg { width: 22px; height: 22px; }
+
+  /* ---------- Slide system ---------- */
+
+  .slides {
+    position: absolute; inset: 0;
+    z-index: 5;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    display: grid;
+    padding: 11vh 6vw 13vh;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .slide .reveal { opacity: 1; }
+
+  /* Typography primitives */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .42em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .display {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--cream);
+    line-height: .98;
+    letter-spacing: -.005em;
+  }
+  .display.huge   { font-size: clamp(3rem, 9vw, 8.5rem); }
+  .display.big    { font-size: clamp(2.4rem, 6vw, 5.8rem); }
+  .display.med    { font-size: clamp(1.8rem, 3.5vw, 3.4rem); }
+  .subtitle {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 400;
+    color: var(--gold);
+    font-size: clamp(1.05rem, 1.7vw, 1.7rem);
+    letter-spacing: .005em;
+  }
+  .subtitle::before { content: "— "; color: var(--gold-soft); }
+  .lede {
+    font-family: var(--body);
+    font-style: normal;
+    font-size: clamp(1rem, 1.35vw, 1.35rem);
+    line-height: 1.55;
+    color: var(--cream);
+    max-width: 48ch;
+  }
+  .body-text {
+    display: block;
+    font-family: var(--body);
+    font-size: clamp(1.05rem, 1.4vw, 1.4rem);
+    line-height: 1.55;
+    color: var(--cream);
+    max-width: 52ch;
+  }
+  .body-text.en {
+    display: block;
+    font-style: italic;
+    color: var(--cream-dim);
+    font-size: clamp(.95rem, 1.2vw, 1.2rem);
+    margin-top: .9rem;
+    padding-top: .9rem;
+    border-top: 1px solid var(--cream-faint);
+    max-width: 52ch;
+  }
+  .rule {
+    width: 100%;
+    height: 1px;
+    background: var(--cream-faint);
+    margin: 1.6rem 0;
+  }
+
+  /* --- Layouts per slide type --- */
+
+  /* Title slide */
+  .layout-title { align-content: center; }
+  .layout-title .display.huge { margin-top: .4rem; }
+  .layout-title .subtitle     { margin-top: 1.2rem; }
+  .layout-title .lede         { margin-top: 2.2rem; }
+  .layout-title .author {
+    position: absolute;
+    bottom: 16vh; right: 8vw;
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 1rem;
+  }
+
+  /* TOC slide */
+  .layout-toc {
+    align-content: center;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .toc-list {
+    margin-top: 2.5rem;
+    display: grid;
+    gap: 1.4rem;
+    max-width: 880px;
+  }
+  .toc-item {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 2rem;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--cream-faint);
+    align-items: baseline;
+  }
+  .toc-item:last-child { border-bottom: none; }
+  .toc-num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 2.2rem;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .toc-title-sq {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: clamp(1.2rem, 1.7vw, 1.6rem);
+    color: var(--cream);
+    letter-spacing: .005em;
+  }
+  .toc-title-en {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: clamp(.95rem, 1.2vw, 1.2rem);
+    margin-top: .25rem;
+  }
+
+  /* Section divider slide */
+  .layout-section {
+    align-content: end;
+    grid-template-rows: 1fr auto;
+    padding-bottom: 22vh;
+  }
+  .layout-section .section-numeral {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: clamp(8rem, 22vw, 22rem);
+    line-height: .85;
+    margin-bottom: 1.6rem;
+    text-shadow: 0 6px 60px rgba(232,201,139,0.18);
+  }
+
+  /* TOPIC content slide — split layout:
+     video sits in the framed LEFT panel, text occupies the right half. */
+  .layout-topic {
+    grid-template-columns: 1fr;
+    align-content: center;
+    /* leave the left half empty for the framed video */
+    padding: 11vh 5vw 13vh 60vw;
+    gap: 0;
+  }
+  /* Topic eyebrow row — pulled OUT of the right-side text column and
+     placed inline with the "Lidhja" brand on a single header line above
+     the framed video. We pad past the brand width so they don't collide. */
+  .layout-topic .topic-eyebrow-row {
+    position: absolute;
+    top: 3.2vh;
+    left: 4vw;
+    width: 56vw;
+    padding-left: clamp(7rem, 11vw, 11rem);
+    display: flex;
+    align-items: baseline;
+    gap: 1.4rem;
+    margin: 0;
+    line-height: 1;
+  }
+  /* Match the brand's line-height on topic slides so the "Lidhja" baseline
+     lines up with the "01" / "SEKSIONI" eyebrow text on the same row. */
+  .stage.split .brand { line-height: 1; }
+  .layout-topic .topic-num {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+  .layout-topic .topic-section-label {
+    font-family: var(--mono);
+    font-size: .65rem;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  /* Year now lives in the cursor tooltip — hide the header chip entirely. */
+  .layout-topic .topic-year { display: none; }
+  .layout-topic .topic-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  .layout-topic .topic-title-sq {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: clamp(1.8rem, 3vw, 3rem);
+    line-height: 1.05;
+    color: var(--cream);
+    letter-spacing: -.005em;
+  }
+  .layout-topic .topic-title-en {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: clamp(1.1rem, 1.5vw, 1.5rem);
+    margin-top: .35rem;
+  }
+  .layout-topic .topic-title-en::before { content: "— "; color: var(--gold-soft); }
+  .layout-topic .rule { margin: 1.4rem 0 1rem; }
+
+  /* References slide */
+  .layout-references {
+    align-content: center;
+  }
+  .ref-list {
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 4vw;
+    row-gap: .9rem;
+    max-width: 1100px;
+  }
+  .ref-item {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 1.2rem;
+    padding: .55rem 0;
+    border-bottom: 1px solid var(--cream-faint);
+    align-items: baseline;
+  }
+  .ref-num {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 1.05rem;
+  }
+  .ref-url {
+    font-family: var(--mono);
+    font-size: .78rem;
+    color: var(--cream);
+    word-break: break-all;
+    text-decoration: none;
+    letter-spacing: .02em;
+  }
+  .ref-url:hover { color: var(--gold); }
+
+  /* End slide */
+  .layout-end {
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+  }
+  .layout-end .display.huge {
+    font-size: clamp(3rem, 9vw, 9rem);
+  }
+
+  /* Language mode toggling: when .mode-sq, hide english blocks etc. */
+  body.mode-sq .body-text.en,
+  body.mode-sq .toc-title-en,
+  body.mode-sq .subtitle,
+  body.mode-sq .topic-title-en { display: none; }
+  body.mode-en .body-text.sq,
+  body.mode-en .toc-title-sq,
+  body.mode-en .topic-title-sq { display: none; }
+  body.mode-en .body-text.en {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+    font-style: normal;
+    color: var(--cream);
+    font-size: clamp(1.05rem, 1.4vw, 1.4rem);
+  }
+  body.mode-en .toc-title-en {
+    font-style: italic;
+    color: var(--cream);
+    font-weight: 600;
+    font-size: clamp(1.2rem, 1.7vw, 1.6rem);
+  }
+
+  /* Help overlay */
+  .help {
+    position: absolute;
+    inset: 0;
+    background: rgba(3,6,26,0.93);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .help.open { display: flex; }
+  .help-inner {
+    max-width: 540px;
+    padding: 3rem 3.5rem;
+    border: 1px solid var(--cream-faint);
+    background: rgba(10, 20, 56, 0.6);
+  }
+  .help h3 {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 2rem;
+    margin-bottom: 1.4rem;
+  }
+  .help dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 2rem;
+    row-gap: .7rem;
+    font-family: var(--mono);
+    font-size: .85rem;
+    color: var(--cream);
+  }
+  .help dt { color: var(--gold); letter-spacing: .12em; }
+  .help dd { color: var(--cream-dim); }
+  .help-close {
+    margin-top: 1.8rem;
+    background: none;
+    border: 1px solid var(--cream-faint);
+    color: var(--cream-dim);
+    font-family: var(--mono);
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    padding: .6rem 1rem;
+    cursor: pointer;
+    font-size: .7rem;
+  }
+  .help-close:hover { color: var(--gold); border-color: var(--gold-soft); }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+
+  /* Smaller screens */
+  @media (max-width: 900px) {
+    .slide { padding: 12vh 6vw 22vh; }
+    .layout-topic {
+      padding: 12vh 6vw 22vh;
+    }
+    /* Mobile: keep the eyebrow inline with the text (no video header bar). */
+    .layout-topic .topic-eyebrow-row {
+      position: static;
+      width: auto;
+      padding-left: 0;
+      margin: 0 0 1.4rem;
+    }
+    .layout-topic .topic-num {
+      font-size: clamp(2.4rem, 8vw, 3.6rem);
+      line-height: .85;
+    }
+    .stage.split .video-stage {
+      top: auto;
+      bottom: 24vh;
+      left: 6vw;
+      right: auto;
+      width: 88vw;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      transform: none;
+    }
+    .video-frame-overlay {
+      top: auto;
+      bottom: 24vh;
+      left: 6vw;
+      right: auto;
+      width: 88vw;
+      aspect-ratio: 16 / 9;
+      transform: none;
+    }
+    .ref-list { grid-template-columns: 1fr; }
+    .brand::after { display: none; }
+  }
+
+  /* Wider screens: keep topic text comfortable within the right pane */
+  @media (min-width: 901px) {
+    .layout-topic .topic-content {
+      max-width: 34vw;
+    }
+  }
+
+  /* ===== TV / Widescreen polish (16:9 and wider) =====
+     Pushes the video panel even larger, scales typography for viewing
+     distance, and trims chrome so the slide breathes edge-to-edge. */
+  @media (min-aspect-ratio: 16/9) and (min-width: 1280px) {
+    html, body { font-size: clamp(16px, 1.15vw, 22px); }
+
+    /* Bigger framed video on TV — still 16:9, just wider. */
+    .stage.split .video-stage,
+    .video-frame-overlay {
+      top: 50%;
+      bottom: auto;
+      left: 3vw;
+      width: 56vw;
+      aspect-ratio: 16 / 9;
+      transform: translateY(-50%);
+    }
+
+    /* Even more dramatic gold corner brackets at this size */
+    .video-frame-overlay::before,
+    .video-frame-overlay::after { width: 64px; height: 64px; }
+
+    /* Push the right-side text inwards a touch */
+    .layout-topic { padding: 9vh 5vw 11vh 62vw; }
+    .layout-topic .topic-content { max-width: 31vw; }
+    /* Eyebrow bar sits on the same row as the slightly larger brand */
+    .layout-topic .topic-eyebrow-row {
+      left: 4vw; width: 60vw; top: 3.2vh;
+      padding-left: clamp(8rem, 12vw, 13rem);
+    }
+    .layout-topic .topic-num { font-size: 1.6rem; }
+
+    /* Larger nav controls for cinema viewing */
+    .nav-arrow { width: 78px; height: 78px; }
+    .nav-arrow svg { width: 26px; height: 26px; }
+
+    /* Slightly larger brand + meta */
+    .brand { font-size: 1.6rem; }
+    .corner-meta { font-size: .76rem; gap: 1.9rem; }
+
+    /* Soften vignette further so the screen reads bright across the room */
+    .stage::before {
+      background:
+        radial-gradient(160% 110% at 50% 50%, transparent 65%, rgba(3,6,26,0.22) 92%, rgba(3,6,26,0.50) 100%),
+        linear-gradient(180deg, rgba(3,6,26,0.14) 0%, transparent 18%, transparent 82%, rgba(3,6,26,0.28) 100%);
+    }
+  }
+
+  /* Ultra-wide (21:9 monitors, some TVs) — go even wider on the video. */
+  @media (min-aspect-ratio: 21/9) {
+    .stage.split .video-stage,
+    .video-frame-overlay {
+      width: 60vw;
+    }
+    .layout-topic { padding-left: 66vw; }
+    .layout-topic .topic-content { max-width: 28vw; }
+    .layout-topic .topic-eyebrow-row { width: 60vw; }
+  }
+</style>
+</head>
+
+<body class="mode-both">
+
+  <main class="stage" id="stage">
+
+    <!-- video crossfade pair — wrapped so we can clip out any black bars
+         baked into the source .mp4 files (we scale the videos slightly
+         beyond the frame, the wrapper crops the overflow). -->
+    <div class="video-stage" id="videoStage" aria-hidden="true">
+      <video class="bg-video" id="videoA" autoplay muted loop playsinline></video>
+      <video class="bg-video" id="videoB" autoplay muted loop playsinline></video>
+      <!-- Image media — used when a slide's `video` field points at a still
+           (.jpg/.png/.webp/.gif/.avif). Same crossfade as the video pair. -->
+      <img class="bg-video bg-image" id="imgA" alt="">
+      <img class="bg-video bg-image" id="imgB" alt="">
+    </div>
+
+    <!-- gold corner accents that appear only when video is framed -->
+    <div class="video-frame-overlay" aria-hidden="true"></div>
+
+    <!-- procedural star field -->
+    <div class="stars" id="stars" aria-hidden="true"></div>
+
+    <!-- slides will be injected here -->
+    <section class="slides" id="slides"></section>
+
+    <!-- chrome -->
+    <div class="chrome">
+      <div class="brand">Lidhja</div>
+
+      <div class="corner-meta">
+        <div class="lang-pill" id="langPill">
+          <span data-lang="sq">SQ</span>
+          <span style="opacity:.4;margin:0 .5rem">·</span>
+          <span data-lang="en">EN</span>
+          <span style="opacity:.4;margin:0 .5rem">·</span>
+          <span data-lang="both" class="active">BOTH</span>
+        </div>
+        <a class="btn" href="editor.html" target="_blank" title="Editori i sllajdeve">EDIT</a>
+        <button id="btnHelp" title="Ndihmë / Help">?</button>
+      </div>
+
+      <div class="footer-bar">
+        <span id="slideLabel">SEKSIONI 00</span>
+        <span><span class="count" id="slideIndex">01</span><span style="opacity:.4"> / </span><span id="slideTotal">00</span></span>
+      </div>
+
+      <!-- TIMELINE: replaces the old progress bar + section pips.
+           Every slide is a tick along the rail. The current slide's year
+           label sits above the cursor. -->
+      <div class="timeline">
+        <div class="timeline-head">
+          <span class="anchor" id="timelineStart">4.6 BYA</span>
+          <span class="anchor" id="timelineEnd">Today</span>
+        </div>
+        <div class="timeline-track" id="timelineTrack">
+          <div class="timeline-rail"></div>
+          <!-- ticks injected by JS -->
+          <div class="timeline-cursor" id="timelineCursor">
+            <span class="timeline-current" id="timelineCurrent">4.6 BYA</span>
+          </div>
+        </div>
+        <div class="timeline-ribbon" id="timelineRibbon"></div>
+      </div>
+
+      <button class="nav-arrow left"  id="prevBtn" aria-label="Mbrapa / Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="nav-arrow right" id="nextBtn" aria-label="Përpara / Forward">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M9 5 L16 12 L9 19" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- help overlay -->
+    <div class="help" id="helpOverlay">
+      <div class="help-inner">
+        <h3>Kontrollet · Controls</h3>
+        <dl>
+          <dt>← →</dt><dd>mbrapa · përpara / back · forward</dd>
+          <dt>SPACE</dt><dd>përpara / next</dd>
+          <dt>HOME / END</dt><dd>fillimi / fundi · first / last</dd>
+          <dt>L</dt><dd>ndërro gjuhën / cycle language</dd>
+          <dt>F</dt><dd>ekran i plotë / fullscreen</dd>
+          <dt>?</dt><dd>kjo ndihmë / this help</dd>
+        </dl>
+        <button class="help-close" id="helpClose">Mbyll · Close</button>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+/* The whole script runs inside an async IIFE so it can `await` the
+   slides.json fetch before any of the DOM setup that depends on the
+   slide data. The presentation no longer loads slides.js — instead
+   it reads slides.json (exported from the PHP-backed SQLite DB by
+   the editor). */
+(async function () {
+"use strict";
+
+function showBootError(err) {
+  const root = document.getElementById("slides");
+  if (root) root.innerHTML = "";
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; flex-direction: column; gap: 1rem;
+    align-items: center; justify-content: center;
+    background: #050a1f; color: #f5efe1;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    padding: 2rem; text-align: center;
+  `;
+  overlay.innerHTML = `
+    <div style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 2.2rem; color: #e8c98b;">
+      Slajdet nuk u ngarkuan
+    </div>
+    <div style="opacity:.7; font-size:.85rem; max-width: 36rem;">${err.message}</div>
+    <div style="opacity:.55; font-size:.75rem; letter-spacing:.18em; text-transform:uppercase;">
+      Hap <a href="bootstrap.html" style="color:#e8c98b">bootstrap.html</a> për të inicializuar DB-në,
+      ose sigurohu që serveri PHP po punon (p.sh. php -S localhost:8000).
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+/* ===========================================================
+   Load slides from slides.json — server-side source of truth.
+   =========================================================== */
+let SLIDES;
+{
+  // PHP's built-in dev server is single-threaded and occasionally drops
+  // a request with `TypeError: NetworkError` when something else (the
+  // HTML, a font, an XHR from the editor) is still being served on the
+  // same socket. Retry a few times before giving up.
+  let lastErr;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const res = await fetch("slides.json?_=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status + " — slides.json nuk u gjet");
+      SLIDES = await res.json();
+      if (!Array.isArray(SLIDES) || SLIDES.length === 0) {
+        throw new Error("slides.json është bosh ose me skemë të gabuar");
+      }
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      console.warn("slides.json fetch attempt " + attempt + " failed:", e.message);
+      // Exponential backoff: 120ms, 240ms, 480ms
+      if (attempt < 4) await new Promise(r => setTimeout(r, 120 * attempt));
+    }
+  }
+  if (lastErr) {
+    console.error(lastErr);
+    showBootError(lastErr);
+    return;
+  }
+}
+
+/* ===========================================================
+   RENDER
+   =========================================================== */
+
+const slidesRoot = document.getElementById("slides");
+
+function el(tag, cls, content) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (content !== undefined) e.innerHTML = content;
+  return e;
+}
+
+function renderSlide(s, i) {
+  const sl = document.createElement("section");
+  sl.className = "slide layout-" + s.type;
+  sl.dataset.index = i;
+
+  if (s.type === "title") {
+    sl.appendChild(el("div", "eyebrow reveal r1", s.eyebrow));
+    sl.appendChild(el("h1", "display huge reveal r2", s.titleSq));
+    sl.appendChild(el("div", "subtitle reveal r3", s.titleEn));
+    const lede = document.createElement("p");
+    lede.className = "reveal r4";
+    lede.innerHTML = `<span class="body-text sq">${s.ledeSq}</span><span class="body-text en">${s.ledeEn}</span>`;
+    sl.appendChild(lede);
+    if (s.author) sl.appendChild(el("div", "author reveal r5", s.author));
+  }
+  else if (s.type === "toc") {
+    sl.appendChild(el("div", "eyebrow reveal r1", s.eyebrow));
+    sl.appendChild(el("h2", "display big reveal r2", s.titleSq));
+    const list = el("div", "toc-list reveal r3");
+    s.items.forEach((it, k) => {
+      const row = el("div", "toc-item");
+      row.appendChild(el("div", "toc-num", it.num));
+      const txt = el("div");
+      txt.appendChild(el("div", "toc-title-sq", it.sq));
+      txt.appendChild(el("div", "toc-title-en", it.en));
+      row.appendChild(txt);
+      row.style.transitionDelay = (0.3 + k*0.1) + "s";
+      list.appendChild(row);
+    });
+    sl.appendChild(list);
+  }
+  else if (s.type === "section") {
+    sl.appendChild(el("div", "section-numeral reveal r1", s.numeral));
+    const block = el("div", "reveal r2");
+    block.appendChild(el("div", "eyebrow", s.eyebrow));
+    block.appendChild(el("h2", "display big", s.titleSq));
+    block.appendChild(el("div", "subtitle", s.titleEn));
+    sl.appendChild(block);
+  }
+  else if (s.type === "topic") {
+    const headRow = el("div", "topic-eyebrow-row reveal r1");
+    headRow.appendChild(el("div", "topic-num", String(s.num).padStart(2,"0")));
+    const labelWrap = document.createElement("div");
+    labelWrap.appendChild(el("div", "topic-section-label", s.eyebrow));
+    headRow.appendChild(labelWrap);
+    if (s.yearLabel) headRow.appendChild(el("div", "topic-year", s.yearLabel));
+    sl.appendChild(headRow);
+
+    const content = el("div", "topic-content");
+    content.appendChild(el("h3", "topic-title-sq reveal r2", s.titleSq));
+    content.appendChild(el("div", "topic-title-en reveal r2", s.titleEn));
+    content.appendChild(el("div", "rule reveal r3"));
+    content.appendChild(el("p", "body-text sq reveal r3", s.bodySq));
+    content.appendChild(el("p", "body-text en reveal r4", s.bodyEn));
+    sl.appendChild(content);
+  }
+  else if (s.type === "references") {
+    sl.appendChild(el("div", "eyebrow reveal r1", s.eyebrow));
+    sl.appendChild(el("h2", "display big reveal r2", s.titleSq));
+    const list = el("div", "ref-list reveal r3");
+    (s.refs || []).forEach((url, k) => {
+      const row = el("div", "ref-item");
+      row.appendChild(el("div", "ref-num", String(k+1).padStart(2,"0")));
+      const a = document.createElement("a");
+      a.className = "ref-url";
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = url;
+      row.appendChild(a);
+      list.appendChild(row);
+    });
+    sl.appendChild(list);
+  }
+  else if (s.type === "end") {
+    sl.appendChild(el("div", "eyebrow reveal r1", s.eyebrow));
+    sl.appendChild(el("h2", "display huge reveal r2", s.titleSq));
+    sl.appendChild(el("div", "subtitle reveal r3", s.titleEn));
+    if (s.ledeSq) {
+      sl.appendChild(el("div", "reveal r4",
+        `<p class="body-text" style="text-align:center;margin-top:2.5rem;font-style:italic;color:var(--gold)">${s.ledeSq}</p>`));
+    }
+  }
+
+  return sl;
+}
+
+/* Render all slides */
+SLIDES.forEach((s, i) => slidesRoot.appendChild(renderSlide(s, i)));
+
+/* ===========================================================
+   TIMELINE — one tick per slide, section-start ticks emphasized.
+   Position is uniform across slides so navigation feels even;
+   the prominent label above the cursor shows each slide's year.
+   =========================================================== */
+
+const timelineTrack    = document.getElementById("timelineTrack");
+const timelineCursor   = document.getElementById("timelineCursor");
+const timelineRibbon   = document.getElementById("timelineRibbon");
+const timelineCurrent  = document.getElementById("timelineCurrent");
+const timelineStartLbl = document.getElementById("timelineStart");
+const timelineEndLbl   = document.getElementById("timelineEnd");
+
+/* Anchor labels: first slide with yearLabel that's not the toc -> start.
+   Last slide's yearLabel -> end. */
+const firstYear = (SLIDES.find(s => s.yearLabel && s.yearLabel !== "—") || {}).yearLabel || "";
+const lastYear  = ([...SLIDES].reverse().find(s => s.yearLabel && s.yearLabel !== "—") || {}).yearLabel || "";
+timelineStartLbl.textContent = firstYear;
+timelineEndLbl.textContent   = lastYear;
+
+const tickEls = [];
+SLIDES.forEach((s, i) => {
+  const pct = SLIDES.length === 1 ? 50 : (i / (SLIDES.length - 1)) * 100;
+  const t = document.createElement("div");
+  t.className = "timeline-tick";
+  if (s.type === "section" || s.type === "title" || i === 0) t.classList.add("section-start");
+  t.style.left = pct + "%";
+  t.title = (s.yearLabel ? s.yearLabel + " — " : "") + (s.titleSq || s.label || "");
+  t.addEventListener("click", () => go(i));
+  timelineTrack.appendChild(t);
+  tickEls.push(t);
+});
+
+/* Section ribbon — four segments labelled with section numbers,
+   so the audience sees where in the deck each section lives. */
+const SECTION_NAMES = ["01 · Toka", "02 · Shpikje", "03 · Drita & koha", "04 · Përbindësh"];
+SECTION_NAMES.forEach((name, idx) => {
+  const seg = document.createElement("div");
+  seg.className = "seg";
+  seg.textContent = name;
+  seg.dataset.section = String(idx + 1);
+  timelineRibbon.appendChild(seg);
+});
+
+/* ===========================================================
+   STAR FIELD
+   =========================================================== */
+const starsRoot = document.getElementById("stars");
+const STAR_COUNT = 140;
+for (let i = 0; i < STAR_COUNT; i++) {
+  const s = document.createElement("div");
+  s.className = "star";
+  s.style.top   = (Math.random()*100) + "%";
+  s.style.left  = (Math.random()*100) + "%";
+  const size = Math.random() < 0.85 ? 1.5 : (Math.random() < 0.7 ? 2.2 : 3);
+  s.style.width = size + "px";
+  s.style.height = size + "px";
+  s.style.animationDelay = (Math.random()*6) + "s";
+  s.style.animationDuration = (3 + Math.random()*7) + "s";
+  starsRoot.appendChild(s);
+}
+
+/* ===========================================================
+   NAVIGATION + VIDEO CROSSFADE
+   =========================================================== */
+
+let current = 0;
+let useA = true;
+const stage    = document.getElementById("stage");
+const videoA   = document.getElementById("videoA");
+const videoB   = document.getElementById("videoB");
+const imgA     = document.getElementById("imgA");
+const imgB     = document.getElementById("imgB");
+
+/* Returns "image" for *.jpg/.png/.webp/.gif/.avif paths, otherwise "video". */
+function mediaKind(src) {
+  return /\.(jpe?g|png|webp|gif|avif)(\?.*)?$/i.test(src) ? "image" : "video";
+}
+const slideEls = [...slidesRoot.querySelectorAll(".slide")];
+const total    = SLIDES.length;
+
+document.getElementById("slideTotal").textContent = String(total).padStart(2,"0");
+
+function sectionFor(s) {
+  if (!s) return 0;
+  if (s.section) return s.section;
+  return 0;
+}
+
+function go(i, opts = {}) {
+  i = Math.max(0, Math.min(total - 1, i));
+  if (i === current && !opts.force) return;
+  current = i;
+  const s = SLIDES[i];
+
+  // slide reveal
+  slideEls.forEach(el => el.classList.remove("active"));
+  slideEls[i].classList.add("active");
+
+  // chrome updates
+  document.getElementById("slideLabel").textContent = s.label || "";
+  document.getElementById("slideIndex").textContent = String(i+1).padStart(2,"0");
+
+  // split layout: text-left + framed video on right for topic slides
+  stage.classList.toggle("split", s.type === "topic");
+
+  // timeline cursor + active tick + year label
+  const pct = total === 1 ? 50 : (i / (total - 1)) * 100;
+  timelineCursor.style.left = pct + "%";
+  tickEls.forEach((t, idx) => {
+    t.classList.toggle("active", idx === i);
+    t.classList.toggle("passed", idx < i);
+  });
+  timelineCurrent.textContent = s.yearLabel || "—";
+
+  // section ribbon
+  const sec = sectionFor(s);
+  [...timelineRibbon.children].forEach((seg) => {
+    seg.classList.toggle("active", Number(seg.dataset.section) === sec);
+  });
+
+  // video crossfade — pass the whole slide so we can read either
+  // `video` (single) or `videos` (playlist).
+  swapVideo(s);
+
+  // Keep the URL in sync (?slide=N) so refreshing or sharing the link
+  // restores the current position. replaceState avoids polluting history.
+  updateUrlForSlide(i);
+}
+
+/* URL helpers — store the current slide as ?slide=N. The legacy #N hash
+   format is still honoured on first load for back-compat. */
+function updateUrlForSlide(i) {
+  const params = new URLSearchParams(location.search);
+  params.set("slide", String(i + 1));
+  const next = location.pathname + "?" + params.toString();
+  if (location.search + location.hash !== "?" + params.toString()) {
+    history.replaceState(null, "", next);
+  }
+}
+function slideFromUrl() {
+  // ?slide=N wins; fall back to #N for older bookmarks.
+  const q = new URLSearchParams(location.search).get("slide");
+  const n = parseInt(q || location.hash.replace("#", ""), 10);
+  return (!isNaN(n) && n >= 1 && n <= total) ? n - 1 : null;
+}
+
+/* A slide may have:
+     - `video: "..."`          (single file)
+     - `videos: ["a","b",...]` (playlist that loops one after the other)
+   getPlaylist() always returns an array (possibly empty). */
+function getPlaylist(s) {
+  if (s && Array.isArray(s.videos) && s.videos.length) {
+    return s.videos.filter(Boolean);
+  }
+  if (s && s.video) return [s.video];
+  return [];
+}
+
+/* Per-slide playback state. When the active video ends we advance to
+   the next entry in the playlist; with a 1-item playlist we just loop. */
+let playlist = [];
+let playlistIdx = 0;
+let activeVideoEl = null;
+
+function onActiveEnded() {
+  // Advance to the next clip and wrap around. Only fires on <video>.
+  if (!playlist.length || !activeVideoEl) return;
+  playlistIdx = (playlistIdx + 1) % playlist.length;
+  const next = playlist[playlistIdx];
+  // If the next item is an image, route through swapVideo logic so we
+  // switch element pairs cleanly. Otherwise just retarget the video.
+  if (mediaKind(next) === "image") {
+    swapVideo({ video: next });
+    return;
+  }
+  activeVideoEl.src = next;
+  activeVideoEl.load();
+  activeVideoEl.play().catch(() => {});
+}
+
+/* swapVideo — despite the name, handles both <video> and <img> media. The
+   slide's `video` (or `videos`) field may point at either an .mp4 or a
+   still image (.jpg/.png/.webp/.gif/.avif); the right element pair is
+   chosen by extension. */
+function swapVideo(slide) {
+  const list = getPlaylist(slide);
+
+  // No media — show only the procedural starfield.
+  if (!list.length) {
+    videoA.classList.remove("active");
+    videoB.classList.remove("active");
+    imgA.classList.remove("active");
+    imgB.classList.remove("active");
+    playlist = [];
+    activeVideoEl = null;
+    return;
+  }
+
+  const firstSrc = list[0];
+  const kind = mediaKind(firstSrc);
+
+  // Pick incoming/outgoing from the matching pair. Toggling `useA` keeps
+  // the within-pair crossfade alternating between A and B.
+  const pair = kind === "image" ? [imgA, imgB] : [videoA, videoB];
+  const incoming = useA ? pair[0] : pair[1];
+  const outgoing = useA ? pair[1] : pair[0];
+
+  // Detach any previous "ended" listener (only relevant on <video>).
+  if (activeVideoEl) {
+    activeVideoEl.removeEventListener("ended", onActiveEnded);
+  }
+
+  playlist = list;
+  playlistIdx = 0;
+  activeVideoEl = kind === "video" ? incoming : null;
+
+  if (kind === "video") {
+    // Single-clip slides loop natively; multi-clip slides advance on `ended`.
+    incoming.loop = (list.length === 1);
+    incoming.addEventListener("ended", onActiveEnded);
+  }
+
+  // Always deactivate every other media element so the cross-kind handoff
+  // (video → image, image → video) is clean.
+  [videoA, videoB, imgA, imgB].forEach(el => {
+    if (el !== incoming) el.classList.remove("active");
+  });
+
+  // If incoming already shows this src (re-entering the same slide), just
+  // re-activate it without reloading.
+  if (incoming.dataset.src === firstSrc && list.length === 1) {
+    incoming.classList.add("active");
+    return;
+  }
+
+  incoming.dataset.src = firstSrc;
+  incoming.src = firstSrc;
+
+  if (kind === "video") {
+    incoming.load();
+    incoming.play().catch(() => {/* autoplay blocked, ignore */});
+    const showIt = () => {
+      incoming.classList.add("active");
+      outgoing.classList.remove("active");
+      incoming.removeEventListener("loadeddata", showIt);
+    };
+    incoming.addEventListener("loadeddata", showIt);
+  } else {
+    // Images: wait for natural decode/load, then fade in.
+    if (incoming.complete && incoming.naturalWidth > 0) {
+      incoming.classList.add("active");
+    } else {
+      const showIt = () => {
+        incoming.classList.add("active");
+        incoming.removeEventListener("load", showIt);
+      };
+      incoming.addEventListener("load", showIt);
+    }
+  }
+
+  // On error (missing file) keep the procedural stars background.
+  incoming.addEventListener("error", () => {
+    incoming.classList.remove("active");
+    outgoing.classList.remove("active");
+  }, { once: true });
+
+  useA = !useA;
+}
+
+/* Controls */
+function next() { go(current + 1); }
+function prev() { go(current - 1); }
+
+document.getElementById("nextBtn").addEventListener("click", next);
+document.getElementById("prevBtn").addEventListener("click", prev);
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea")) return;
+  switch (e.key) {
+    case "ArrowRight":
+    case " ":
+    case "PageDown":
+      e.preventDefault(); next(); break;
+    case "ArrowLeft":
+    case "PageUp":
+      e.preventDefault(); prev(); break;
+    case "Home":
+      e.preventDefault(); go(0); break;
+    case "End":
+      e.preventDefault(); go(total - 1); break;
+    case "f": case "F":
+      toggleFullscreen(); break;
+    case "l": case "L":
+      cycleLang(); break;
+    case "?":
+      toggleHelp(); break;
+    case "Escape":
+      document.getElementById("helpOverlay").classList.remove("open");
+      break;
+  }
+});
+
+/* Click-to-advance disabled by user preference — navigate with arrows only */
+
+/* Language cycling */
+const LANG_ORDER = ["both", "sq", "en"];
+function cycleLang() {
+  const cur = document.body.className.replace("mode-", "").trim();
+  const idx = LANG_ORDER.indexOf(cur);
+  const nxt = LANG_ORDER[(idx + 1) % LANG_ORDER.length];
+  document.body.className = "mode-" + nxt;
+  document.querySelectorAll("#langPill [data-lang]").forEach(span => {
+    span.classList.toggle("active", span.dataset.lang === nxt);
+  });
+}
+document.getElementById("langPill").addEventListener("click", cycleLang);
+
+/* Help overlay */
+function toggleHelp() {
+  document.getElementById("helpOverlay").classList.toggle("open");
+}
+document.getElementById("btnHelp").addEventListener("click", toggleHelp);
+document.getElementById("helpClose").addEventListener("click", () => {
+  document.getElementById("helpOverlay").classList.remove("open");
+});
+
+/* Fullscreen */
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.();
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+/* URL sync — supports ?slide=N (primary) and #N (legacy fallback). */
+function syncFromUrl() {
+  const i = slideFromUrl();
+  if (i !== null) go(i, { force: true });
+}
+window.addEventListener("hashchange", syncFromUrl);
+// Back/forward through replaceState'd URLs.
+window.addEventListener("popstate", syncFromUrl);
+
+/* Reload-while-keeping-position helper. The editor (when it opens this
+   window via window.open) calls presentationWindow.lidhjaReload() right
+   after writing slides.js to disk, which re-loads the page and picks
+   up the new content. The ?slide=N param preserves the current slide. */
+function reloadKeepingSlide() {
+  const params = new URLSearchParams(location.search);
+  params.set("slide", String(current + 1));
+  location.href = location.pathname + "?" + params.toString();
+}
+window.lidhjaReload = reloadKeepingSlide;
+
+/* Init — read the URL, then render. */
+const startIdx = slideFromUrl();
+go(startIdx ?? 0, { force: true });
+
+})(); // end async IIFE
+</script>
+</body>
+</html>

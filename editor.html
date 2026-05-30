@@ -1,0 +1,1942 @@
+<!doctype html>
+<html lang="sq">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Editori i sllajdeve · Arkitektura</title>
+
+<style>
+  :root {
+    --navy:        #0a1438;
+    --navy-deep:   #050a1f;
+    --navy-darker: #03061a;
+    --gold:        #e8c98b;
+    --gold-bright: #f3dba1;
+    --gold-soft:   #c9a86a;
+    --cream:       #f5efe1;
+    --cream-dim:   rgba(245, 239, 225, 0.62);
+    --cream-faint: rgba(245, 239, 225, 0.30);
+    --line:        rgba(245, 239, 225, 0.16);
+    --danger:      #d97064;
+
+    --display: "Cormorant Garamond", "Apple Garamond", "EB Garamond",
+               "Iowan Old Style", "Hoefler Text", Garamond, Georgia, serif;
+    --body:    "Cormorant Garamond", "Iowan Old Style", "Hoefler Text",
+               Garamond, Georgia, serif;
+    --mono:    "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, monospace;
+
+    --ease: cubic-bezier(.2,.7,.2,1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--navy-darker);
+    color: var(--cream);
+    font-family: var(--body);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--gold); color: var(--navy-deep); }
+
+  /* ---------- Layout shell ---------- */
+
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 64px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "sidebar main";
+    height: 100vh;
+  }
+
+  .topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.4rem;
+    background: var(--navy-deep);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .brand {
+    display: flex;
+    align-items: baseline;
+    gap: .8rem;
+  }
+  .topbar .brand .name {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.4rem;
+    color: var(--gold);
+  }
+  .topbar .brand .sub {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  .toolbar {
+    display: flex;
+    gap: .55rem;
+    align-items: center;
+  }
+  .btn {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    background: none;
+    color: var(--cream-dim);
+    border: 1px solid var(--line);
+    padding: .55rem .85rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .2s var(--ease);
+    white-space: nowrap;
+  }
+  .btn:hover { color: var(--gold); border-color: var(--gold-soft); }
+  .btn.primary {
+    color: var(--navy-deep);
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .btn.primary:hover {
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+    color: var(--navy-deep);
+  }
+  .btn.danger { border-color: rgba(217,112,100,.4); color: rgba(217,112,100,.85); }
+  .btn.danger:hover { background: var(--danger); color: var(--cream); border-color: var(--danger); }
+  .btn.saved {
+    color: var(--gold-bright);
+    border-color: var(--gold-bright);
+  }
+
+  /* ---------- Sidebar (slide list) ---------- */
+
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--navy-deep);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 1rem 0;
+  }
+  .side-hd {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+    padding: .8rem 1.2rem .5rem;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  .side-hd .count { flex: 1; }
+  .btn-mini {
+    font-family: var(--mono);
+    font-size: .55rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--gold);
+    border: 1px solid var(--gold-soft);
+    padding: .35rem .6rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all .15s var(--ease);
+  }
+  .btn-mini:hover { background: rgba(232,201,139,0.1); border-color: var(--gold); }
+  .slide-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    column-gap: .7rem;
+    align-items: baseline;
+    padding: .65rem 1.2rem;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background .15s var(--ease), border-color .15s var(--ease);
+  }
+  .slide-row .row-actions {
+    position: absolute;
+    right: .45rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: .25rem;
+    opacity: 0;
+    transition: opacity .15s var(--ease);
+  }
+  .slide-row:hover .row-actions { opacity: 1; }
+  .slide-row .row-btn {
+    background: rgba(11,16,28,0.85);
+    border: 1px solid transparent;
+    color: var(--cream-dim);
+    font-family: var(--mono);
+    font-size: .9rem;
+    line-height: 1;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .slide-row .row-btn.dup:hover {
+    color: var(--gold);
+    border-color: var(--gold-soft);
+  }
+  .slide-row .row-btn.del:hover {
+    color: rgba(240,182,108,1);
+    border-color: rgba(240,182,108,.5);
+  }
+
+  /* Insert affordance between slide rows */
+  .insert-gap {
+    position: relative;
+    height: 8px;
+    margin: 0 1.2rem;
+    cursor: pointer;
+  }
+  .insert-gap::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 26px;
+    top: 50%;
+    height: 1px;
+    background: var(--gold);
+    opacity: 0;
+    transition: opacity .12s var(--ease);
+  }
+  .insert-gap::after {
+    content: "+";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    background: var(--navy-deep);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: .85rem;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity .12s var(--ease);
+  }
+  .insert-gap:hover::before,
+  .insert-gap:hover::after { opacity: 1; }
+  .slide-row:hover { background: rgba(245,239,225,0.03); }
+  .slide-row.active {
+    background: rgba(232,201,139,0.08);
+    border-left-color: var(--gold);
+  }
+  .slide-row .idx {
+    font-family: var(--mono);
+    font-size: .68rem;
+    color: var(--gold);
+    letter-spacing: .04em;
+  }
+  .slide-row .ttl {
+    font-family: var(--body);
+    font-size: .95rem;
+    color: var(--cream);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .slide-row.dirty .ttl::after {
+    content: "•";
+    color: var(--gold);
+    margin-left: .25rem;
+  }
+  .slide-row .yr {
+    font-family: var(--mono);
+    font-size: .58rem;
+    letter-spacing: .12em;
+    color: var(--cream-dim);
+    white-space: nowrap;
+  }
+  .slide-row.section-row {
+    background: rgba(232,201,139,0.04);
+    border-top: 1px solid var(--line);
+  }
+  .slide-row.section-row .ttl { color: var(--gold); font-style: italic; }
+
+  /* ---------- Main editor pane ---------- */
+
+  .main {
+    grid-area: main;
+    overflow-y: auto;
+    padding: 2.2rem 3rem 4rem;
+    max-width: 920px;
+  }
+
+  .crumb {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+    margin-bottom: .3rem;
+  }
+  .crumb .pill {
+    display: inline-block;
+    padding: .15rem .55rem;
+    margin-left: .5rem;
+    border: 1px solid var(--gold-soft);
+    color: var(--gold);
+    border-radius: 2px;
+  }
+
+  h1.title {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--cream);
+    font-size: 2.2rem;
+    line-height: 1.1;
+    margin-bottom: 2rem;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 1.4rem;
+  }
+  .field { display: grid; gap: .4rem; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+  .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  label {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  input[type="text"],
+  input[type="number"],
+  textarea {
+    width: 100%;
+    background: var(--navy-deep);
+    border: 1px solid var(--line);
+    color: var(--cream);
+    font-family: var(--body);
+    font-size: 1rem;
+    padding: .65rem .8rem;
+    line-height: 1.45;
+    outline: none;
+    transition: border-color .15s var(--ease);
+    border-radius: 2px;
+  }
+  textarea { resize: vertical; min-height: 110px; font-family: var(--body); }
+  input.mono, textarea.mono { font-family: var(--mono); font-size: .85rem; }
+  input:focus, textarea:focus { border-color: var(--gold-soft); }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .12em;
+    color: var(--cream-dim);
+    margin-top: .2rem;
+  }
+  .hint a { color: var(--gold); text-decoration: none; }
+  .hint a:hover { text-decoration: underline; }
+
+  .section-divider {
+    margin: 2rem 0 1rem;
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border-bottom: 1px solid var(--gold-soft);
+    padding-bottom: .4rem;
+  }
+
+  /* Items editors (toc, references) */
+  .item-list { display: grid; gap: .7rem; }
+  .item-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 1fr auto;
+    gap: .7rem;
+    align-items: center;
+  }
+  .item-row.refs { grid-template-columns: 60px 1fr auto; }
+  .item-row .del {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--cream-dim);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: .7rem;
+    padding: .4rem .6rem;
+    border-radius: 2px;
+  }
+  .item-row .del:hover { color: var(--danger); border-color: var(--danger); }
+
+  .video-preview {
+    margin-top: .6rem;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .6rem .8rem;
+    border: 1px dashed var(--line);
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: .68rem;
+    color: var(--cream-dim);
+    letter-spacing: .08em;
+  }
+  .video-preview .ok  { color: var(--gold); }
+  .video-preview .miss { color: var(--danger); }
+  .video-preview video,
+  .video-preview img {
+    width: 120px; height: 68px;
+    object-fit: cover;
+    background: var(--navy);
+    border: 1px solid var(--line);
+  }
+
+  .empty {
+    color: var(--cream-dim);
+    font-style: italic;
+    padding: 3rem 0;
+    text-align: center;
+  }
+
+  /* Save indicator */
+  .save-state {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  .save-state.saved { color: var(--gold-bright); }
+  .save-state.dirty { color: #f0b66c; }
+
+  /* ---------- Video picker modal ---------- */
+  .picker-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(3, 6, 26, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+    animation: pickerFade .2s var(--ease);
+  }
+  @keyframes pickerFade { from { opacity: 0; } to { opacity: 1; } }
+  .picker-panel {
+    width: min(880px, 92vw);
+    max-height: 86vh;
+    background: var(--navy-deep);
+    border: 1px solid var(--gold-soft);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,201,139,0.06);
+    display: grid;
+    grid-template-rows: auto auto auto 1fr auto;
+    overflow: hidden;
+  }
+  .picker-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1.1rem 1.4rem .9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .picker-head h2 {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 1.6rem;
+    font-weight: 400;
+  }
+  .picker-head .picker-close {
+    background: none; border: 1px solid var(--line);
+    color: var(--cream-dim);
+    font-family: var(--mono); font-size: 1rem;
+    width: 32px; height: 32px;
+    cursor: pointer;
+    transition: all .15s var(--ease);
+  }
+  .picker-head .picker-close:hover { color: var(--danger); border-color: var(--danger); }
+  .picker-search {
+    margin: .9rem 1.4rem .5rem;
+  }
+  .picker-meta {
+    padding: 0 1.4rem .5rem;
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+  .picker-list {
+    overflow-y: auto;
+    padding: 0 1.4rem 1rem;
+  }
+  .picker-group-label {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 1rem 0 .4rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: .35rem;
+  }
+  .picker-item {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    gap: 1rem;
+    align-items: center;
+    padding: .55rem .6rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    transition: all .15s var(--ease);
+  }
+  .picker-item:hover {
+    background: rgba(245,239,225,0.04);
+    border-color: var(--line);
+  }
+  .picker-item.selected {
+    background: rgba(232,201,139,0.10);
+    border-color: var(--gold-soft);
+  }
+  .picker-item video,
+  .picker-item img {
+    width: 96px; height: 54px;
+    object-fit: cover;
+    background: var(--navy);
+    border: 1px solid var(--line);
+  }
+  .picker-item .info { display: grid; gap: .15rem; min-width: 0; }
+  .picker-item .name {
+    font-family: var(--body);
+    color: var(--cream);
+    font-size: 1rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .picker-item .path {
+    font-family: var(--mono);
+    font-size: .65rem;
+    color: var(--cream-dim);
+    letter-spacing: .04em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .picker-item .bytes {
+    font-family: var(--mono);
+    font-size: .62rem;
+    color: var(--cream-dim);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .picker-empty {
+    color: var(--cream-dim);
+    font-style: italic;
+    padding: 2rem 0;
+    text-align: center;
+  }
+  .picker-upload {
+    border-top: 1px solid var(--line);
+    padding: .9rem 1.4rem 1.1rem;
+    display: grid;
+    gap: .55rem;
+    background: rgba(232,201,139,0.025);
+  }
+  .picker-upload .upload-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: .55rem;
+    align-items: center;
+  }
+  .picker-upload label.upload-label {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .picker-upload input[type="file"] {
+    font-family: var(--mono);
+    font-size: .72rem;
+    color: var(--cream-dim);
+    background: var(--navy-darker);
+    border: 1px solid var(--line);
+    padding: .4rem .55rem;
+    border-radius: 2px;
+  }
+  .picker-upload input[type="file"]::file-selector-button {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    background: none;
+    color: var(--gold);
+    border: 1px solid var(--gold-soft);
+    padding: .3rem .65rem;
+    margin-right: .7rem;
+    cursor: pointer;
+  }
+  .picker-upload .upload-status {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .14em;
+    color: var(--cream-dim);
+    min-height: 1em;
+  }
+  .picker-upload .upload-status.err { color: var(--danger); }
+  .picker-upload .upload-status.ok  { color: var(--gold-bright); }
+
+  .video-picker-btn {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    background: none;
+    color: var(--gold);
+    border: 1px solid var(--gold-soft);
+    padding: .35rem .65rem;
+    cursor: pointer;
+    transition: all .15s var(--ease);
+    white-space: nowrap;
+  }
+  .video-picker-btn:hover {
+    background: var(--gold);
+    color: var(--navy-deep);
+  }
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="name">Editori i sllajdeve</div>
+      <div class="sub">· Arkitektura e Universit</div>
+      <div id="diagInfo" style="font-family:var(--mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--cream-dim);margin-left:1.2rem;">…</div>
+    </div>
+    <div class="toolbar">
+      <span class="save-state saved" id="saveState">RUAJTUR</span>
+      <button class="btn" id="btnSave" title="Ruaj ndryshimet në DB">RUAJ</button>
+      <button class="btn" id="btnExportJson" title="Rishkruaj slides.json nga DB">EKSPORTO JSON</button>
+      <button class="btn" id="btnReset" title="Rikthe sllajdet origjinale (mbishkruaj DB)">RESET</button>
+      <button class="btn" id="btnDownload" title="Shkarko një kopje të slides.json">SHKARKO JSON</button>
+      <button class="btn primary" id="btnOpenPres">HAP PREZANTIMIN ↗</button>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="side-hd">
+      <span class="count" id="sideCount">…</span>
+    </div>
+    <!-- slide rows + insert-gaps injected here -->
+  </aside>
+
+  <main class="main" id="main">
+    <div class="empty">Zgjidh një sllajd nga e majta për ta redaktuar.</div>
+  </main>
+
+</div>
+
+<!-- Bring in the default slide data (same file the presentation uses) -->
+<script src="slides.js"></script>
+
+<script>
+/* ===========================================================
+   PERSISTENCE — talks to api.php (SQLite-backed PHP API).
+
+   - GET  api.php?action=list    → load slides
+   - POST api.php?action=save    → replace all slides, re-export JSON
+   - POST api.php?action=export  → re-write slides.json from DB
+   - POST api.php?action=reset   → wipe DB
+   - POST api.php?action=seed    → seed DB (used by RESET)
+
+   No browser storage involved — the server's SQLite file is the
+   source of truth; slides.json is an artifact for the presentation.
+   =========================================================== */
+
+const API_URL = "api.php";
+
+// Tracks a presentation window opened from this editor so we can
+// force-reload it after a save without depending on storage events.
+let presentationWindow = null;
+let serverStatus = null; // populated on boot
+
+async function api(action, opts = {}) {
+  const url = API_URL + "?action=" + action + (opts.qs ? "&" + opts.qs : "");
+  const init = { method: opts.method || "GET" };
+  if (opts.body !== undefined) {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(opts.body);
+  }
+  let res, payload;
+  try {
+    res = await fetch(url, init);
+  } catch (e) {
+    throw new Error(`Nuk u arrit te API (${API_URL}). A po punon serveri PHP? · ${e.message}`);
+  }
+  try {
+    payload = await res.json();
+  } catch (_) {
+    throw new Error(`API ${action}: pritej JSON, mora HTTP ${res.status}`);
+  }
+  if (!res.ok || payload.ok === false) {
+    throw new Error(`API ${action}: ${payload.error || ("HTTP " + res.status)}`);
+  }
+  return payload;
+}
+
+async function fetchSlidesFromApi() {
+  const data = await api("list");
+  if (!Array.isArray(data)) {
+    throw new Error("API ktheu përgjigje të pavlefshme për 'list'.");
+  }
+  return data;
+}
+
+async function fetchServerStatus() {
+  try {
+    const r = await api("status");
+    serverStatus = r;
+    return r;
+  } catch (_) { return null; }
+}
+
+async function saveSlides({ silent = false } = {}) {
+  if (!Array.isArray(slides) || slides.length === 0) {
+    if (!silent) alert("Nuk mund të ruash një grup bosh sllajdesh.");
+    return false;
+  }
+  try {
+    const r = await api("save", { method: "POST", body: slides });
+    setSaveState("saved");
+    serverStatus = {
+      slides_count:     r.saved,
+      json_exists:      true,
+      json_bytes:       r.exported?.bytes || 0,
+      json_path:        r.exported?.path || "slides.json",
+      last_saved_at:    new Date().toISOString(),
+      last_exported_at: new Date().toISOString(),
+    };
+    updateDiagnostic();
+
+    // Force-reload an open presentation so it picks up the new slides.json.
+    if (presentationWindow && !presentationWindow.closed) {
+      try {
+        if (typeof presentationWindow.lidhjaReload === "function") {
+          presentationWindow.lidhjaReload();
+        } else {
+          presentationWindow.location.reload();
+        }
+      } catch (_) {}
+    }
+    return true;
+  } catch (e) {
+    if (!silent) alert("Nuk u arrit ruajtja:\n" + e.message);
+    setSaveState("dirty");
+    return false;
+  }
+}
+
+async function exportJson() {
+  try {
+    const r = await api("export");
+    serverStatus = { ...(serverStatus || {}),
+      json_exists: true,
+      json_bytes:  r.exported?.bytes || 0,
+      json_path:   r.exported?.path || "slides.json",
+      last_exported_at: new Date().toISOString(),
+    };
+    updateDiagnostic();
+    return true;
+  } catch (e) {
+    alert("Nuk u arrit eksporti:\n" + e.message);
+    return false;
+  }
+}
+
+function downloadBlob(text, name, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("sq-AL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch (_) { return iso; }
+}
+
+function updateDiagnostic() {
+  const el = document.getElementById("diagInfo");
+  if (!el) return;
+  const count = slides.length;
+  if (!serverStatus) {
+    el.innerHTML = `${count} sllajde · <span style='color:var(--cream-faint)'>statusi i serverit i panjohur</span>`;
+    return;
+  }
+  const json = serverStatus.json_exists
+    ? `<span style='color:var(--gold)'>${serverStatus.json_path} (${(serverStatus.json_bytes/1024).toFixed(1)} kB)</span>`
+    : `<span style='color:var(--danger)'>jo ende</span>`;
+  el.innerHTML = `DB: <b>${count}</b> sllajde · JSON: ${json} · ruajtur: ${fmtTime(serverStatus.last_saved_at)}`;
+}
+
+function flashSavedToast(msg) {
+  let toast = document.getElementById("savedToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "savedToast";
+    toast.style.cssText = `
+      position: fixed; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%);
+      background: var(--gold); color: var(--navy-deep);
+      font-family: var(--mono); font-size: .68rem;
+      letter-spacing: .26em; text-transform: uppercase;
+      padding: .7rem 1.4rem;
+      border-radius: 2px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      z-index: 100;
+      opacity: 0;
+      transition: opacity .25s ease;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg || "✓ U RUAJT NË DISK";
+  toast.style.opacity = "1";
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.opacity = "0"; }, 2200);
+}
+
+function defaultSlidesClone() {
+  return JSON.parse(JSON.stringify(window.DEFAULT_SLIDES));
+}
+
+function setSaveState(state) {
+  const el = document.getElementById("saveState");
+  el.classList.remove("saved", "dirty");
+  if (state === "saved") {
+    el.classList.add("saved");
+    el.textContent = "RUAJTUR";
+  } else {
+    el.classList.add("dirty");
+    el.textContent = "PA RUAJTUR…";
+  }
+}
+
+/* ===========================================================
+   STATE
+   =========================================================== */
+// Start with the slides.js defaults — the async boot at the end of
+// this file will replace this with whatever the PHP API returns from
+// the DB. If the API call fails or the DB is empty, we keep the
+// defaults and the user can RUAJ to seed.
+let slides  = defaultSlidesClone();
+let current = 0;
+
+/* ===========================================================
+   SIDEBAR
+   =========================================================== */
+const sidebar  = document.getElementById("sidebar");
+const sideCount = document.getElementById("sideCount");
+
+function makeInsertGap(insertAt) {
+  const gap = document.createElement("div");
+  gap.className = "insert-gap";
+  gap.title = "Shto sllajd këtu";
+  gap.addEventListener("click", (e) => {
+    e.stopPropagation();
+    insertSlideAt(insertAt);
+  });
+  return gap;
+}
+
+function renderSidebar() {
+  // Clear, then rebuild
+  [...sidebar.querySelectorAll(".slide-row, .insert-gap")].forEach(n => n.remove());
+  sideCount.textContent = slides.length + " SLLAJDE";
+
+  // Gap above the first row
+  sidebar.appendChild(makeInsertGap(0));
+
+  slides.forEach((s, i) => {
+    const row = document.createElement("div");
+    row.className = "slide-row";
+    if (i === current) row.classList.add("active");
+    if (s.type === "section" || s.type === "title" || s.type === "toc"
+        || s.type === "references" || s.type === "end") {
+      row.classList.add("section-row");
+    }
+    row.dataset.index = i;
+
+    const idx = document.createElement("div");
+    idx.className = "idx";
+    idx.textContent = String(i + 1).padStart(2, "0");
+
+    const ttl = document.createElement("div");
+    ttl.className = "ttl";
+    ttl.textContent = s.titleSq || s.label || s.type;
+
+    const yr = document.createElement("div");
+    yr.className = "yr";
+    yr.textContent = s.yearLabel || "";
+
+    row.appendChild(idx);
+    row.appendChild(ttl);
+    row.appendChild(yr);
+
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+
+    const dup = document.createElement("button");
+    dup.className = "row-btn dup";
+    dup.type = "button";
+    dup.title = "Dyfisho këtë sllajd";
+    dup.textContent = "⎘";
+    dup.addEventListener("click", (e) => {
+      e.stopPropagation();
+      duplicateSlideAt(i);
+    });
+    actions.appendChild(dup);
+
+    const del = document.createElement("button");
+    del.className = "row-btn del";
+    del.type = "button";
+    del.title = "Fshi këtë sllajd";
+    del.textContent = "×";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteSlideAt(i);
+    });
+    actions.appendChild(del);
+
+    row.appendChild(actions);
+
+    row.addEventListener("click", () => {
+      current = i;
+      renderSidebar();
+      renderEditor();
+    });
+
+    sidebar.appendChild(row);
+
+    // Gap after this row (also covers "below the last row")
+    sidebar.appendChild(makeInsertGap(i + 1));
+  });
+}
+
+function blankTopicSlide() {
+  return {
+    type: "topic",
+    yearsBP: null,
+    yearLabel: "",
+    eyebrow: "",
+    titleSq: "Sllajdi i ri",
+    titleEn: "New slide",
+    ledeSq: "",
+    ledeEn: "",
+    video: "",
+    points: [],
+    refs: [],
+    label: ""
+  };
+}
+
+function insertSlideAt(i) {
+  const at = Math.max(0, Math.min(i, slides.length));
+  slides.splice(at, 0, blankTopicSlide());
+  current = at;
+  markDirty();
+  renderSidebar();
+  renderEditor();
+}
+
+function duplicateSlideAt(i) {
+  if (i < 0 || i >= slides.length) return;
+  const copy = JSON.parse(JSON.stringify(slides[i]));
+  slides.splice(i + 1, 0, copy);
+  current = i + 1;
+  markDirty();
+  renderSidebar();
+  renderEditor();
+}
+
+function deleteSlideAt(i) {
+  if (slides.length <= 1) {
+    alert("Nuk mund të fshish të vetmin sllajd.");
+    return;
+  }
+  const s = slides[i];
+  const label = s.titleSq || s.label || s.type;
+  if (!confirm(`Fshi sllajdin ${i + 1}: “${label}”?`)) return;
+  slides.splice(i, 1);
+  if (current > i)            current--;
+  else if (current >= slides.length) current = slides.length - 1;
+  markDirty();
+  renderSidebar();
+  renderEditor();
+}
+
+/* ===========================================================
+   EDITOR PANE
+   =========================================================== */
+const main = document.getElementById("main");
+
+function fieldText(labelText, value, onInput, opts = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  const lab = document.createElement("label");
+  lab.textContent = labelText;
+  const input = document.createElement("input");
+  input.type = opts.number ? "number" : "text";
+  if (opts.mono) input.classList.add("mono");
+  if (opts.placeholder) input.placeholder = opts.placeholder;
+  input.value = value ?? "";
+  input.addEventListener("input", () => {
+    onInput(opts.number ? (input.value === "" ? null : Number(input.value)) : input.value);
+  });
+  wrap.appendChild(lab);
+  wrap.appendChild(input);
+  if (opts.hint) {
+    const h = document.createElement("div");
+    h.className = "hint";
+    h.innerHTML = opts.hint;
+    wrap.appendChild(h);
+  }
+  return wrap;
+}
+
+function fieldArea(labelText, value, onInput, rows = 4) {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  const lab = document.createElement("label");
+  lab.textContent = labelText;
+  const ta = document.createElement("textarea");
+  ta.rows = rows;
+  ta.value = value ?? "";
+  ta.addEventListener("input", () => onInput(ta.value));
+  wrap.appendChild(lab);
+  wrap.appendChild(ta);
+  return wrap;
+}
+
+function dividerEl(text) {
+  const d = document.createElement("div");
+  d.className = "section-divider";
+  d.textContent = text;
+  return d;
+}
+
+function rowEl(...children) {
+  const r = document.createElement("div");
+  r.className = "field-row";
+  if (children.length === 3) r.classList.add("three");
+  children.forEach(c => r.appendChild(c));
+  return r;
+}
+
+/* When any field changes, push to slides[current] and mark dirty.
+   Auto-save is debounced. The auto-save runs in "silent" mode — it
+   only writes if a file handle is already linked, since browsers
+   refuse to open file pickers without a direct user gesture. The
+   user-facing RUAJ button always works (it's a real gesture). */
+let saveTimer = null;
+function markDirty() {
+  setSaveState("dirty");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    await saveSlides({ silent: true });
+    // refresh sidebar in case the title or year changed
+    renderSidebar();
+  }, 400);
+}
+
+function videoPreviewEl(s) {
+  if (!s.video) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "video-preview";
+  const v = document.createElement("video");
+  v.muted = true;
+  v.loop = true;
+  v.playsInline = true;
+  v.autoplay = true;
+  v.src = s.video;
+  v.addEventListener("loadeddata", () => {
+    state.classList.add("ok");
+    state.textContent = "✓ video u gjet";
+  });
+  v.addEventListener("error", () => {
+    state.classList.add("miss");
+    state.textContent = "✗ video mungon (fallback: yjet)";
+  });
+  v.play().catch(() => {});
+  const state = document.createElement("div");
+  state.textContent = "…duke ngarkuar";
+  wrap.appendChild(v);
+  wrap.appendChild(state);
+  return wrap;
+}
+
+function renderEditor() {
+  main.innerHTML = "";
+  const s = slides[current];
+  if (!s) return;
+
+  const crumb = document.createElement("div");
+  crumb.className = "crumb";
+  crumb.innerHTML = `SLLAJDI ${String(current+1).padStart(2,"0")} / ${String(slides.length).padStart(2,"0")}
+                     <span class="pill">${s.type.toUpperCase()}</span>`;
+  main.appendChild(crumb);
+
+  const title = document.createElement("h1");
+  title.className = "title";
+  title.textContent = s.titleSq || s.label || s.type;
+  main.appendChild(title);
+
+  const form = document.createElement("div");
+  form.className = "form-grid";
+
+  // --- Common fields (label, eyebrow) ---
+  if (s.label !== undefined)
+    form.appendChild(fieldText("Etiketa (label në fund)", s.label,
+      v => { s.label = v; markDirty(); }, { mono: true }));
+
+  if (s.eyebrow !== undefined)
+    form.appendChild(fieldText("Eyebrow (mbi titull)", s.eyebrow,
+      v => { s.eyebrow = v; markDirty(); }, { mono: true }));
+
+  // --- Year fields (everything except toc) ---
+  if (s.type !== "toc") {
+    form.appendChild(rowEl(
+      fieldText("Year label (në timeline)", s.yearLabel,
+        v => { s.yearLabel = v; markDirty(); },
+        { mono: true, placeholder: "4.6 BYA, 1572, Today…" }),
+      fieldText("Vite para 2026 (numerike)", s.yearsBP,
+        v => { s.yearsBP = v; markDirty(); },
+        { number: true, mono: true,
+          hint: "Përdoret nga editori për renditje opsionale. P.sh. 4_600_000_000, 454, 0." })
+    ));
+  }
+
+  // --- Type-specific blocks ---
+  if (s.type === "title") {
+    form.appendChild(dividerEl("Titulli"));
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+    form.appendChild(dividerEl("Përshkrim hyrës"));
+    form.appendChild(fieldArea("Lede (SQ)", s.ledeSq, v => { s.ledeSq = v; markDirty(); }, 3));
+    form.appendChild(fieldArea("Lede (EN)", s.ledeEn, v => { s.ledeEn = v; markDirty(); }, 3));
+    form.appendChild(fieldText("Autori", s.author, v => { s.author = v; markDirty(); }));
+  }
+
+  else if (s.type === "toc") {
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+    form.appendChild(dividerEl("Seksionet (rresht për rresht)"));
+    const list = document.createElement("div");
+    list.className = "item-list";
+    (s.items || []).forEach((it, k) => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      const num = document.createElement("input");
+      num.type = "text"; num.className = "mono";
+      num.value = it.num || "";
+      num.addEventListener("input", () => { it.num = num.value; markDirty(); });
+
+      const sq = document.createElement("input");
+      sq.type = "text"; sq.value = it.sq || "";
+      sq.addEventListener("input", () => { it.sq = sq.value; markDirty(); });
+
+      const en = document.createElement("input");
+      en.type = "text"; en.value = it.en || "";
+      en.addEventListener("input", () => { it.en = en.value; markDirty(); });
+
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "×";
+      del.title = "Hiq këtë rresht";
+      del.addEventListener("click", () => {
+        s.items.splice(k, 1);
+        markDirty();
+        renderEditor();
+      });
+
+      row.appendChild(num); row.appendChild(sq); row.appendChild(en); row.appendChild(del);
+      list.appendChild(row);
+    });
+    form.appendChild(list);
+    const add = document.createElement("button");
+    add.className = "btn";
+    add.textContent = "+ Shto rresht";
+    add.style.marginTop = ".8rem";
+    add.style.justifySelf = "start";
+    add.addEventListener("click", () => {
+      (s.items = s.items || []).push({ num: "", sq: "", en: "" });
+      markDirty();
+      renderEditor();
+    });
+    form.appendChild(add);
+  }
+
+  else if (s.type === "section") {
+    form.appendChild(rowEl(
+      fieldText("Numri (numeral)", s.numeral, v => { s.numeral = v; markDirty(); }, { mono: true }),
+      fieldText("Indeksi i seksionit", s.section,
+        v => { s.section = v; markDirty(); }, { number: true, mono: true })
+    ));
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+  }
+
+  else if (s.type === "topic") {
+    form.appendChild(rowEl(
+      fieldText("Seksioni", s.section,
+        v => { s.section = v; markDirty(); }, { number: true, mono: true }),
+      fieldText("Numri brenda seksionit", s.num,
+        v => { s.num = v; markDirty(); }, { number: true, mono: true })
+    ));
+    form.appendChild(dividerEl("Titulli"));
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+    form.appendChild(dividerEl("Trupi i tekstit"));
+    form.appendChild(fieldArea("Body (SQ)", s.bodySq, v => { s.bodySq = v; markDirty(); }, 5));
+    form.appendChild(fieldArea("Body (EN)", s.bodyEn, v => { s.bodyEn = v; markDirty(); }, 5));
+  }
+
+  else if (s.type === "references") {
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+    form.appendChild(dividerEl("Lidhjet"));
+    const list = document.createElement("div");
+    list.className = "item-list";
+    (s.refs || []).forEach((url, k) => {
+      const row = document.createElement("div");
+      row.className = "item-row refs";
+      const idx = document.createElement("input");
+      idx.type = "text"; idx.className = "mono"; idx.disabled = true;
+      idx.value = String(k + 1).padStart(2, "0");
+      const u = document.createElement("input");
+      u.type = "text"; u.className = "mono"; u.value = url;
+      u.addEventListener("input", () => { s.refs[k] = u.value; markDirty(); });
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "×";
+      del.addEventListener("click", () => {
+        s.refs.splice(k, 1); markDirty(); renderEditor();
+      });
+      row.appendChild(idx); row.appendChild(u); row.appendChild(del);
+      list.appendChild(row);
+    });
+    form.appendChild(list);
+    const add = document.createElement("button");
+    add.className = "btn";
+    add.textContent = "+ Shto lidhje";
+    add.style.marginTop = ".8rem";
+    add.style.justifySelf = "start";
+    add.addEventListener("click", () => {
+      (s.refs = s.refs || []).push("");
+      markDirty(); renderEditor();
+    });
+    form.appendChild(add);
+  }
+
+  else if (s.type === "end") {
+    form.appendChild(rowEl(
+      fieldText("Titulli (SQ)", s.titleSq, v => { s.titleSq = v; markDirty(); }),
+      fieldText("Title (EN)", s.titleEn, v => { s.titleEn = v; markDirty(); })
+    ));
+    form.appendChild(fieldArea("Mesazhi i fundit (SQ)", s.ledeSq,
+      v => { s.ledeSq = v; markDirty(); }, 2));
+  }
+
+  // --- Videos (every slide type) ---
+  // Slides support either `video` (single, looping) or `videos` (an array
+  // that plays one after the other). We always edit as an array under the
+  // hood for simplicity, and normalise back to `video` when only one is set.
+  form.appendChild(dividerEl("Video sfondi"));
+
+  // Build a working list out of whatever the slide currently has.
+  const videoList = Array.isArray(s.videos) && s.videos.length
+    ? s.videos.slice()
+    : (s.video ? [s.video] : [""]);
+  if (videoList.length === 0) videoList.push("");
+
+  // Persist back to the slide in canonical form.
+  function persistVideos() {
+    const cleaned = videoList.map(v => (v || "").trim()).filter(Boolean);
+    if (cleaned.length <= 1) {
+      s.video = cleaned[0] || "";
+      delete s.videos;
+    } else {
+      s.videos = cleaned;
+      delete s.video;
+    }
+    markDirty();
+  }
+
+  function renderVideoBlock() {
+    // Remove the old block, re-render in place.
+    const old = main.querySelector(".video-block");
+    if (old) old.remove();
+
+    const block = document.createElement("div");
+    block.className = "video-block";
+    block.style.display = "grid";
+    block.style.gap = "1rem";
+
+    videoList.forEach((url, k) => {
+      const row = document.createElement("div");
+      row.style.display = "grid";
+      row.style.gap = ".4rem";
+
+      const labelRow = document.createElement("div");
+      labelRow.style.display = "flex";
+      labelRow.style.justifyContent = "space-between";
+      labelRow.style.alignItems = "baseline";
+
+      const lab = document.createElement("label");
+      lab.textContent = `Video ${k + 1} — shteg`;
+      labelRow.appendChild(lab);
+
+      if (videoList.length > 1) {
+        const rm = document.createElement("button");
+        rm.className = "btn";
+        rm.textContent = "× HIQ";
+        rm.style.padding = ".25rem .55rem";
+        rm.addEventListener("click", () => {
+          videoList.splice(k, 1);
+          persistVideos();
+          renderVideoBlock();
+        });
+        labelRow.appendChild(rm);
+      }
+
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "mono";
+      inp.value = url || "";
+      inp.placeholder = "videos/section1/slide4.mp4";
+      inp.addEventListener("input", () => {
+        videoList[k] = inp.value;
+        persistVideos();
+        // Refresh the preview for this row
+        renderPreview(row, inp.value);
+      });
+
+      // Picker button — opens a modal to browse / upload videos.
+      const inputRow = document.createElement("div");
+      inputRow.style.display = "grid";
+      inputRow.style.gridTemplateColumns = "1fr auto";
+      inputRow.style.gap = ".5rem";
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "video-picker-btn";
+      pick.textContent = "ZGJIDH ↗";
+      pick.title = "Shfleto videot ekzistuese ose ngarko të reja";
+      pick.addEventListener("click", () => {
+        openVideoPicker({
+          current: inp.value,
+          defaultTarget: suggestedVideoTarget(s),
+          onPick: (path) => {
+            inp.value = path;
+            videoList[k] = path;
+            persistVideos();
+            renderPreview(row, path);
+          },
+        });
+      });
+      inputRow.appendChild(inp);
+      inputRow.appendChild(pick);
+
+      row.appendChild(labelRow);
+      row.appendChild(inputRow);
+      const previewSlot = document.createElement("div");
+      previewSlot.className = "video-preview-slot";
+      row.appendChild(previewSlot);
+      renderPreview(row, url);
+
+      block.appendChild(row);
+    });
+
+    if (videoList.length < 2) {
+      const add = document.createElement("button");
+      add.className = "btn";
+      add.textContent = "+ SHTO VIDEO TË DYTË";
+      add.style.justifySelf = "start";
+      add.addEventListener("click", () => {
+        videoList.push("");
+        persistVideos();
+        renderVideoBlock();
+      });
+      block.appendChild(add);
+    }
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.innerHTML = "Nëse vendos dy video, ato luhen njëra pas tjetrës (loop sekuencial). Nëse vendos vetëm një, ajo luhet në loop si zakonisht.";
+    block.appendChild(hint);
+
+    main.appendChild(block);
+  }
+
+  function renderPreview(rowEl, url) {
+    const slot = rowEl.querySelector(".video-preview-slot");
+    if (!slot) return;
+    slot.innerHTML = "";
+    if (!url) return;
+    const wrap = document.createElement("div");
+    wrap.className = "video-preview";
+
+    // Pick the right element by extension — slides can use stills too.
+    const isImage = /\.(jpe?g|png|webp|gif|avif)(\?.*)?$/i.test(url);
+    const v = document.createElement(isImage ? "img" : "video");
+    v.src = url;
+    const state = document.createElement("div");
+    state.textContent = "…duke ngarkuar";
+
+    if (isImage) {
+      v.alt = "";
+      v.addEventListener("load", () => {
+        state.classList.add("ok");
+        state.textContent = "✓ imazhi u gjet";
+      });
+      v.addEventListener("error", () => {
+        state.classList.add("miss");
+        state.textContent = "✗ imazhi mungon (fallback: yjet)";
+      });
+    } else {
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.autoplay = true;
+      v.addEventListener("loadeddata", () => {
+        state.classList.add("ok");
+        state.textContent = "✓ video u gjet";
+      });
+      v.addEventListener("error", () => {
+        state.classList.add("miss");
+        state.textContent = "✗ video mungon (fallback: yjet)";
+      });
+      v.play().catch(() => {});
+    }
+
+    wrap.appendChild(v);
+    wrap.appendChild(state);
+    slot.appendChild(wrap);
+  }
+
+  main.appendChild(form);
+  renderVideoBlock();
+}
+
+/* ===========================================================
+   VIDEO PICKER MODAL
+   =========================================================== */
+
+// Suggest a sensible default upload path based on the current slide.
+// For topic slides we mirror the convention used by slides.js's topic()
+// helper: videos/section{section}/slide{num}.mp4. For everything else
+// we fall back to a generic name in the videos/ root.
+function suggestedVideoTarget(s) {
+  if (s && s.type === "topic" && s.section && s.num) {
+    return `videos/section${s.section}/slide${s.num}.mp4`;
+  }
+  if (s && s.section) return `videos/section${s.section}/${s.type || "bg"}.mp4`;
+  return `videos/${(s && s.type) || "background"}.mp4`;
+}
+
+function fmtBytes(n) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " kB";
+  return (n / (1024 * 1024)).toFixed(2) + " MB";
+}
+
+let _pickerEsc = null; // active escape handler so we can detach it
+
+function closeVideoPicker() {
+  const back = document.querySelector(".picker-backdrop");
+  if (back) back.remove();
+  if (_pickerEsc) {
+    window.removeEventListener("keydown", _pickerEsc);
+    _pickerEsc = null;
+  }
+}
+
+async function openVideoPicker({ current, defaultTarget, onPick }) {
+  // Close any open picker first.
+  closeVideoPicker();
+
+  const back = document.createElement("div");
+  back.className = "picker-backdrop";
+  back.addEventListener("click", (e) => { if (e.target === back) closeVideoPicker(); });
+
+  const panel = document.createElement("div");
+  panel.className = "picker-panel";
+
+  // --- Head ---
+  const head = document.createElement("div");
+  head.className = "picker-head";
+  head.innerHTML = `<h2>Zgjidh media</h2>`;
+  const close = document.createElement("button");
+  close.className = "picker-close";
+  close.type = "button";
+  close.textContent = "×";
+  close.title = "Mbyll (Esc)";
+  close.addEventListener("click", closeVideoPicker);
+  head.appendChild(close);
+  panel.appendChild(head);
+
+  // --- Search ---
+  const search = document.createElement("input");
+  search.type = "text";
+  search.className = "mono picker-search";
+  search.placeholder = "Kërko sipas emrit ose shtegut…";
+  panel.appendChild(search);
+
+  // --- Meta line ---
+  const meta = document.createElement("div");
+  meta.className = "picker-meta";
+  meta.textContent = "…duke ngarkuar listën";
+  panel.appendChild(meta);
+
+  // --- List ---
+  const list = document.createElement("div");
+  list.className = "picker-list";
+  list.innerHTML = `<div class="picker-empty">…</div>`;
+  panel.appendChild(list);
+
+  // --- Upload row ---
+  const up = document.createElement("div");
+  up.className = "picker-upload";
+  up.innerHTML = `
+    <label class="upload-label">Ose ngarko media të re (.mp4 ose imazh)</label>
+    <div class="upload-row">
+      <input type="file" accept="video/mp4,.mp4,image/jpeg,image/png,image/webp,image/gif,image/avif,.jpg,.jpeg,.png,.webp,.gif,.avif" class="up-file" />
+      <input type="text" class="mono up-target" placeholder="videos/sectionX/slideY.mp4" />
+      <button type="button" class="btn primary up-go">NGARKO</button>
+    </div>
+    <div class="upload-status"></div>
+  `;
+  const fileInp   = up.querySelector(".up-file");
+  const targetInp = up.querySelector(".up-target");
+  const goBtn     = up.querySelector(".up-go");
+  const status    = up.querySelector(".upload-status");
+  targetInp.value = defaultTarget || "";
+
+  // Pre-fill the target from the filename once a file is chosen,
+  // but only if the user hasn't already typed something custom.
+  fileInp.addEventListener("change", () => {
+    if (!fileInp.files || !fileInp.files[0]) return;
+    if (targetInp.value && targetInp.value !== defaultTarget) return;
+    // Keep the directory from defaultTarget, swap the filename. If the
+    // picked file is an image, swap the default .mp4 stem extension out
+    // for the actual file's extension so the upload validator accepts it.
+    const fname = fileInp.files[0].name.replace(/[^A-Za-z0-9._-]/g, "_");
+    const ext = (fname.match(/\.([A-Za-z0-9]+)$/) || [,"mp4"])[1].toLowerCase();
+    if (defaultTarget && defaultTarget.includes("/")) {
+      const dir = defaultTarget.slice(0, defaultTarget.lastIndexOf("/"));
+      // If defaultTarget had a stem we can re-use it with the new extension:
+      const stem = defaultTarget.slice(dir.length + 1).replace(/\.[^.]+$/, "");
+      targetInp.value = stem ? `${dir}/${stem}.${ext}` : `${dir}/${fname}`;
+    } else {
+      targetInp.value = `videos/${fname}`;
+    }
+  });
+
+  panel.appendChild(up);
+  back.appendChild(panel);
+  document.body.appendChild(back);
+
+  // Esc closes the modal.
+  _pickerEsc = (e) => { if (e.key === "Escape") closeVideoPicker(); };
+  window.addEventListener("keydown", _pickerEsc);
+
+  // Focus search after the modal mounts.
+  setTimeout(() => search.focus(), 50);
+
+  // --- Load the video list ---
+  let allItems = [];
+  async function loadList() {
+    list.innerHTML = `<div class="picker-empty">…duke ngarkuar</div>`;
+    try {
+      const r = await fetch(API_URL + "?action=videos", { cache: "no-store" });
+      const data = await r.json();
+      if (!Array.isArray(data)) throw new Error("përgjigje e pavlefshme");
+      allItems = data;
+      const nVid = allItems.filter(it => it.kind !== "image").length;
+      const nImg = allItems.length - nVid;
+      meta.textContent = nImg > 0
+        ? `${allItems.length} media (${nVid} video · ${nImg} imazhe)`
+        : `${allItems.length} video të disponueshme`;
+      renderList(search.value);
+    } catch (e) {
+      list.innerHTML = `<div class="picker-empty" style="color:var(--danger)">Nuk u ngarkua lista: ${e.message}</div>`;
+      meta.textContent = "—";
+    }
+  }
+
+  function renderList(filter) {
+    list.innerHTML = "";
+    const q = (filter || "").trim().toLowerCase();
+    const filtered = q
+      ? allItems.filter(it => it.path.toLowerCase().includes(q) || it.name.toLowerCase().includes(q))
+      : allItems;
+
+    if (filtered.length === 0) {
+      const e = document.createElement("div");
+      e.className = "picker-empty";
+      e.textContent = allItems.length === 0
+        ? "Nuk ka media. Ngarko një më poshtë."
+        : "Asnjë rezultat për këtë filtër.";
+      list.appendChild(e);
+      return;
+    }
+
+    // Group by section (parsed from sectionN parent dir), with null first.
+    const groups = new Map();
+    filtered.forEach(it => {
+      const key = it.section !== null && it.section !== undefined ? `Seksioni ${String(it.section).padStart(2,"0")}` : "Të tjera";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(it);
+    });
+
+    // Sort group keys naturally; "Të tjera" goes last.
+    const keys = [...groups.keys()].sort((a, b) => {
+      if (a === "Të tjera") return 1;
+      if (b === "Të tjera") return -1;
+      return a.localeCompare(b, "sq", { numeric: true });
+    });
+
+    keys.forEach(k => {
+      const lbl = document.createElement("div");
+      lbl.className = "picker-group-label";
+      lbl.textContent = k;
+      list.appendChild(lbl);
+
+      groups.get(k).forEach(it => {
+        const row = document.createElement("div");
+        row.className = "picker-item";
+        if (it.path === current) row.classList.add("selected");
+
+        // Thumbnail: <video> for .mp4 (hover-to-preview), <img> for stills.
+        // `it.kind` is set by the API; fall back to a path-based check.
+        const isImage = it.kind === "image" ||
+          /\.(jpe?g|png|webp|gif|avif)$/i.test(it.path);
+        const v = document.createElement(isImage ? "img" : "video");
+        v.src = it.path;
+        if (!isImage) {
+          v.muted = true;
+          v.playsInline = true;
+          v.preload = "metadata";
+          // Brief hover preview — only for videos.
+          row.addEventListener("mouseenter", () => { v.play().catch(() => {}); });
+          row.addEventListener("mouseleave", () => { try { v.pause(); v.currentTime = 0; } catch(_){} });
+        } else {
+          v.alt = it.name;
+          v.loading = "lazy";
+        }
+
+        const info = document.createElement("div");
+        info.className = "info";
+        const name = document.createElement("div");
+        name.className = "name";
+        name.textContent = it.name;
+        const path = document.createElement("div");
+        path.className = "path";
+        path.textContent = it.path;
+        info.appendChild(name);
+        info.appendChild(path);
+
+        const bytes = document.createElement("div");
+        bytes.className = "bytes";
+        bytes.textContent = fmtBytes(it.bytes);
+
+        row.appendChild(v);
+        row.appendChild(info);
+        row.appendChild(bytes);
+
+        row.addEventListener("click", () => {
+          onPick(it.path);
+          closeVideoPicker();
+        });
+
+        list.appendChild(row);
+      });
+    });
+  }
+
+  search.addEventListener("input", () => renderList(search.value));
+
+  // --- Upload handler ---
+  goBtn.addEventListener("click", async () => {
+    status.className = "upload-status";
+    if (!fileInp.files || !fileInp.files[0]) {
+      status.textContent = "✗ Zgjidh një skedar të parë.";
+      status.classList.add("err");
+      return;
+    }
+    if (!targetInp.value.trim()) {
+      status.textContent = "✗ Plotëso shtegun e destinacionit.";
+      status.classList.add("err");
+      return;
+    }
+    status.textContent = "…duke ngarkuar";
+    goBtn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append("file", fileInp.files[0]);
+      fd.append("target", targetInp.value.trim());
+      const r = await fetch(API_URL + "?action=upload", { method: "POST", body: fd });
+      const payload = await r.json();
+      if (!r.ok || payload.ok === false) {
+        throw new Error(payload.error || ("HTTP " + r.status));
+      }
+      status.className = "upload-status ok";
+      status.textContent = `✓ U ngarkua: ${payload.uploaded.path} (${fmtBytes(payload.uploaded.bytes)})`;
+      // Refresh the list and auto-select the just-uploaded file.
+      await loadList();
+      onPick(payload.uploaded.path);
+      // Brief delay so the user sees the success message, then close.
+      setTimeout(closeVideoPicker, 700);
+    } catch (e) {
+      status.className = "upload-status err";
+      status.textContent = "✗ " + e.message;
+    } finally {
+      goBtn.disabled = false;
+    }
+  });
+
+  loadList();
+}
+
+/* ===========================================================
+   TOOLBAR ACTIONS
+   =========================================================== */
+
+document.getElementById("btnSave").addEventListener("click", async () => {
+  // Force-save immediately and flash a toast so the user knows it landed.
+  clearTimeout(saveTimer);
+  if (await saveSlides({ silent: false })) flashSavedToast();
+});
+
+
+// Force-export slides.json from current DB state (without saving in-memory edits).
+document.getElementById("btnExportJson").addEventListener("click", async () => {
+  // Save first so the JSON reflects in-memory edits.
+  clearTimeout(saveTimer);
+  if (!(await saveSlides({ silent: false }))) return;
+  flashSavedToast("✓ slides.json U EKSPORTUA");
+});
+
+// SHKARKO JSON — local download of the current in-memory state, for backup.
+document.getElementById("btnDownload").addEventListener("click", () => {
+  const data = JSON.stringify(slides, null, 2);
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadBlob(data, `arkitektura-slides-${stamp}.json`, "application/json");
+});
+
+document.getElementById("btnOpenPres").addEventListener("click", async () => {
+  // Save in-memory edits so the JSON the presentation fetches is fresh.
+  clearTimeout(saveTimer);
+  await saveSlides({ silent: true });
+  // Reuse the same window if it's still open, otherwise open a new one.
+  if (presentationWindow && !presentationWindow.closed) {
+    try { presentationWindow.focus(); } catch (_) {}
+    try {
+      if (typeof presentationWindow.lidhjaReload === "function") {
+        presentationWindow.lidhjaReload();
+      } else {
+        presentationWindow.location.reload();
+      }
+    } catch (_) {}
+  } else {
+    presentationWindow = window.open("index.html", "lidhja-presentation");
+  }
+});
+
+/* Build a slides.js wrapper from the current edits — kept as a utility
+   for the RESET flow and any future "download slides.js" need. The PHP
+   API doesn't use this; index.html reads slides.json directly. */
+function buildSlidesJs(arr) {
+  const esc = (s) => {
+    if (s === null || s === undefined) return "null";
+    if (typeof s === "number") return String(s);
+    if (typeof s === "boolean") return s ? "true" : "false";
+    // Use JSON.stringify for safe string escaping (handles quotes, newlines, unicode)
+    return JSON.stringify(String(s));
+  };
+
+  const emitSlide = (s) => {
+    // Topic slides — use the topic() helper for terseness, matching the
+    // existing slides.js style.
+    if (s.type === "topic") {
+      return `  topic(${s.section}, ${s.num}, ${s.yearsBP}, ${esc(s.yearLabel)},\n`
+           + `    ${esc(s.titleSq)},\n`
+           + `    ${esc(s.titleEn)},\n`
+           + `    ${esc(s.bodySq)},\n`
+           + `    ${esc(s.bodyEn)})`;
+    }
+    // All other slide types — emit as a literal object, only the fields
+    // that are actually set. Pretty-print keys in a consistent order.
+    const order = ["type","section","video","videos","yearsBP","yearLabel",
+                   "numeral","eyebrow","titleSq","titleEn",
+                   "ledeSq","ledeEn","author","items","refs","label"];
+    const lines = ["  {"];
+    order.forEach((k) => {
+      if (!(k in s)) return;
+      const v = s[k];
+      if (v === undefined) return;
+      if (Array.isArray(v)) {
+        if (k === "items") {
+          // toc items: { num, sq, en }
+          const rows = v.map(it =>
+            `      { num: ${esc(it.num)}, sq: ${esc(it.sq)}, en: ${esc(it.en)} }`
+          ).join(",\n");
+          lines.push(`    ${k}: [\n${rows}\n    ],`);
+        } else if (k === "refs" || k === "videos") {
+          const rows = v.map(u => `      ${esc(u)}`).join(",\n");
+          lines.push(`    ${k}: [\n${rows}\n    ],`);
+        } else {
+          lines.push(`    ${k}: ${JSON.stringify(v)},`);
+        }
+      } else {
+        lines.push(`    ${k}: ${esc(v)},`);
+      }
+    });
+    // Trim trailing comma on the last entry for cleanliness
+    const last = lines[lines.length - 1];
+    if (last.endsWith(",")) lines[lines.length - 1] = last.slice(0, -1);
+    lines.push("  }");
+    return lines.join("\n");
+  };
+
+  const body = arr.map(emitSlide).join(",\n\n");
+
+  return (
+`/* =============================================================
+   SLIDES — auto-generated by editor.html.
+
+   Replace this file in the project root to make your edits
+   permanent on disk. After replacing, hard-refresh index.html.
+   ============================================================= */
+
+function topic(section, num, yearsBP, yearLabel, titleSq, titleEn, bodySq, bodyEn) {
+  return {
+    type: "topic",
+    section, num,
+    yearsBP, yearLabel,
+    video: \`videos/section\${section}/slide\${num}.mp4\`,
+    eyebrow: \`SEKSIONI \${String(section).padStart(2,"0")} · \${String(num).padStart(2,"0")}\`,
+    titleSq, titleEn, bodySq, bodyEn,
+    label: \`SEKSIONI \${String(section).padStart(2,"0")}\`
+  };
+}
+
+const SLIDES = [
+
+${body}
+
+];
+
+if (typeof window !== "undefined") {
+  window.DEFAULT_SLIDES = SLIDES;
+}
+`);
+}
+
+document.getElementById("btnReset").addEventListener("click", async () => {
+  if (!confirm("Të rikthehen sllajdet origjinale? Të gjitha redaktimet humbasin.")) return;
+  slides = defaultSlidesClone();
+  current = 0;
+  await saveSlides({ silent: true });
+  renderSidebar();
+  renderEditor();
+  updateDiagnostic();
+});
+
+/* Keyboard: ↑/↓ navigate sidebar, Cmd/Ctrl+S to save */
+window.addEventListener("keydown", async (e) => {
+  // Cmd/Ctrl + S — works even when an input is focused.
+  if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
+    e.preventDefault();
+    clearTimeout(saveTimer);
+    if (await saveSlides({ silent: false })) flashSavedToast();
+    return;
+  }
+  if (e.target.matches("input, textarea")) return;
+  if (e.key === "ArrowDown") {
+    current = Math.min(slides.length - 1, current + 1);
+    renderSidebar(); renderEditor();
+    e.preventDefault();
+  } else if (e.key === "ArrowUp") {
+    current = Math.max(0, current - 1);
+    renderSidebar(); renderEditor();
+    e.preventDefault();
+  }
+});
+
+/* Boot — render the slides.js defaults immediately so the UI is alive,
+   then in the background ask the PHP API for the real DB content and
+   re-render once it arrives. If the DB is empty we keep showing the
+   defaults; the user's first RUAJ will seed the DB. */
+renderSidebar();
+renderEditor();
+setSaveState("saved");
+updateDiagnostic();
+
+(async function bootFromApi() {
+  try {
+    const [list, status] = await Promise.all([
+      fetchSlidesFromApi(),
+      fetchServerStatus(),
+    ]);
+    if (Array.isArray(list) && list.length > 0) {
+      slides  = list;
+      current = 0;
+      renderSidebar();
+      renderEditor();
+    } else {
+      // Empty DB — keep defaults visible; nudge the user.
+      flashSavedToast("DB BOSH · KLIKO RUAJ PËR TA INICIALIZUAR");
+    }
+    if (status) serverStatus = status;
+    updateDiagnostic();
+  } catch (e) {
+    console.warn("API boot failed:", e);
+    const el = document.getElementById("diagInfo");
+    if (el) {
+      el.innerHTML = `<span style='color:var(--danger)'>⚠ API i palidhshëm</span> · `
+                   + `${slides.length} sllajde · ${e.message}`;
+    }
+  }
+})();
+</script>
+</body>
+</html>

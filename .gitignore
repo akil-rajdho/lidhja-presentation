@@ -1,0 +1,7 @@
+# Background media — too large for git, dropped in locally
+videos/
+
+# macOS / editor noise
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="sq">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bootstrap · Arkitektura</title>
+<style>
+  :root {
+    --navy:    #0a1438;
+    --deep:    #050a1f;
+    --gold:    #e8c98b;
+    --cream:   #f5efe1;
+    --danger:  #d97064;
+    --mono:    "JetBrains Mono", ui-monospace, Menlo, Monaco, monospace;
+    --serif:   "Cormorant Garamond", "Iowan Old Style", Garamond, Georgia, serif;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 800px at 20% 10%, rgba(232,201,139,.05), transparent 60%),
+      var(--deep);
+    color: var(--cream);
+    font-family: var(--serif);
+    padding: 4rem 2rem;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 2.6rem;
+    color: var(--gold);
+    letter-spacing: .01em;
+    margin: 0 0 .4rem;
+  }
+  .sub {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: rgba(245,239,225,.6);
+    margin-bottom: 2.4rem;
+  }
+  .log {
+    font-family: var(--mono);
+    font-size: .85rem;
+    line-height: 1.8;
+    padding: 1.6rem 1.8rem;
+    border: 1px solid rgba(245,239,225,.16);
+    background: rgba(10,20,56,.55);
+    border-radius: 2px;
+    min-height: 200px;
+  }
+  .log .ok      { color: var(--gold); }
+  .log .err     { color: var(--danger); }
+  .log .info    { color: var(--cream); }
+  .log .muted   { color: rgba(245,239,225,.5); }
+  .log a {
+    color: var(--gold);
+    text-decoration: none;
+    border-bottom: 1px solid currentColor;
+  }
+  .log a:hover { color: #f3dba1; }
+  .row { display: block; margin-bottom: .25rem; }
+  .row::before {
+    content: "·  ";
+    color: rgba(245,239,225,.4);
+  }
+  .actions {
+    display: flex;
+    gap: .8rem;
+    margin-top: 1.6rem;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .26em;
+    text-transform: uppercase;
+    padding: .7rem 1.2rem;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    background: transparent;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn:hover { background: var(--gold); color: var(--deep); }
+  .btn.primary { background: var(--gold); color: var(--deep); }
+  .btn.primary:hover { background: #f3dba1; }
+  .btn.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn.danger:hover { background: var(--danger); color: var(--cream); }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Bootstrap</h1>
+  <div class="sub">Inicializimi i bazës së të dhënave</div>
+
+  <div class="log" id="log"></div>
+
+  <div class="actions" id="actions" hidden>
+    <a href="editor.html" class="btn primary">→ Hap editorin</a>
+    <a href="index.html"  class="btn">→ Hap prezantimin</a>
+    <button class="btn danger" id="btnReseed">Rifillim (mbishkruaj DB)</button>
+  </div>
+</main>
+
+<!-- Load defaults from slides.js — used only on first run / forced reseed. -->
+<script src="slides.js"></script>
+<script>
+const log = document.getElementById("log");
+const actions = document.getElementById("actions");
+
+function row(html, cls) {
+  const d = document.createElement("div");
+  d.className = "row " + (cls || "info");
+  d.innerHTML = html;
+  log.appendChild(d);
+}
+function done() { actions.hidden = false; }
+
+async function callApi(action, opts = {}) {
+  const res = await fetch("api.php?action=" + action, {
+    method: opts.method || "GET",
+    headers: opts.body ? { "Content-Type": "application/json" } : {},
+    body:    opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let json;
+  try { json = await res.json(); }
+  catch (_) { throw new Error(`API ${action}: HTTP ${res.status}, jo JSON`); }
+  if (!res.ok || json.ok === false) {
+    throw new Error(`API ${action}: ${json.error || JSON.stringify(json)}`);
+  }
+  return json;
+}
+
+async function seed(force) {
+  if (!window.DEFAULT_SLIDES || !window.DEFAULT_SLIDES.length) {
+    row("✗ slides.js nuk u ngarkua ose nuk ka DEFAULT_SLIDES.", "err");
+    return false;
+  }
+  const url = force ? "seed&force=1" : "seed";
+  row(`Po dërgon ${window.DEFAULT_SLIDES.length} sllajde te API…`, "muted");
+  const r = await callApi(url, { method: "POST", body: window.DEFAULT_SLIDES });
+  if (r.seeded === false) {
+    row(`DB ka tashmë ${r.count} sllajde — kapërcyer.`, "muted");
+    return true;
+  }
+  row(`✓ U futën <b>${r.seeded}</b> sllajde në DB.`, "ok");
+  row(`✓ U shkrua <code>${r.exported.path}</code> (${r.exported.bytes} bytes).`, "ok");
+  return true;
+}
+
+async function run({ force = false } = {}) {
+  log.innerHTML = "";
+  try {
+    row("Po kontrollon API-n…", "muted");
+    const status = await callApi("status");
+
+    row(`DB: <b>${status.slides_count}</b> sllajde · `
+      + `JSON: ${status.json_exists ? `<b>po</b> (${status.json_bytes} bytes)` : "<b>jo</b>"}`,
+        "info");
+
+    if (status.slides_count > 0 && !force) {
+      row("DB është inicializuar tashmë — nuk po e mbishkruaj.", "muted");
+      if (!status.json_exists) {
+        row("Po shkruaj <code>slides.json</code>…", "muted");
+        const exp = await callApi("export");
+        row(`✓ U shkrua <code>${exp.exported.path}</code>.`, "ok");
+      }
+      done();
+      return;
+    }
+
+    await seed(force);
+    done();
+  } catch (e) {
+    row("✗ " + e.message, "err");
+    row("Sigurohu që ke nisur serverin PHP (p.sh. <code>php -S localhost:8000</code>) "
+      + "dhe që ke hapur këtë faqe nga ai port.", "muted");
+  }
+}
+
+document.getElementById("btnReseed").addEventListener("click", async () => {
+  if (!confirm("Të mbishkruhet DB me sllajdet origjinale nga slides.js?\n"
+              + "Çdo redaktim humbet.")) return;
+  await callApi("reset", { method: "POST" });
+  await run({ force: true });
+});
+
+run();
+</script>
+</body>
+</html>
