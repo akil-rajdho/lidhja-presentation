@@ -585,7 +585,7 @@
     {
         "type": "topic",
         "section": 4,
-        "num": 4,
+        "num": 1,
         "yearsBP": 92,
         "yearLabel": "1934",
         "video": "videos/section3/neutron star.mp4",
@@ -599,7 +599,7 @@
     {
         "type": "topic",
         "section": 4,
-        "num": 5,
+        "num": 2,
         "yearsBP": 59,
         "yearLabel": "1967",
         "video": "videos/section3/pulsars.mp4",
@@ -613,7 +613,7 @@
     {
         "type": "topic",
         "section": 4,
-        "num": 6,
+        "num": 3,
         "yearsBP": 47,
         "yearLabel": "1979",
         "video": "videos/section3/magnetars.mp4",
@@ -627,7 +627,7 @@
     {
         "type": "topic",
         "section": 4,
-        "num": 8,
+        "num": 4,
         "yearsBP": 7,
         "yearLabel": "2019",
         "video": "videos/section3/black holes.mp4",
@@ -641,7 +641,7 @@
     {
         "type": "topic",
         "section": 4,
-        "num": 7,
+        "num": 5,
         "yearsBP": 63,
         "yearLabel": "1963",
         "video": "videos/section3/quasars.mp4",
@@ -650,6 +650,20 @@
         "titleEn": "Quasars — the brightest light in the universe",
         "bodySq": "Vrima të zeza supermasive që gëlltisin yje të tërë, duke lëshuar dritë që mund të shihet nga skaji i universit.",
         "bodyEn": "Supermassive black holes devouring entire stars, releasing light visible from the edge of the observable universe.",
+        "label": "SEKSIONI 04"
+    },
+    {
+        "type": "topic",
+        "section": 4,
+        "num": 6,
+        "yearsBP": 0,
+        "yearLabel": "2026",
+        "video": "videos/section3/solar-system.mp4",
+        "eyebrow": "SEKSIONI 04 · 07",
+        "titleSq": "Sistemi Diellor",
+        "titleEn": "Solar System",
+        "bodySq": "Si planetet rrotullohen rreth Diellit",
+        "bodyEn": "How planets orbit the sun.",
         "label": "SEKSIONI 04"
     },
     {

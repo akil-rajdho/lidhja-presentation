@@ -1,5 +1,7 @@
 # Background media — too large for git, dropped in locally
 videos/
+*.mp4
+*.mov
 
 # macOS / editor noise
 .DS_Store
