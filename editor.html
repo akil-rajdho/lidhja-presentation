@@ -234,7 +234,21 @@
     transition: opacity .12s var(--ease);
   }
   .insert-gap:hover::before,
-  .insert-gap:hover::after { opacity: 1; }
+  .insert-gap:hover::after,
+  .insert-gap.drag-over::before,
+  .insert-gap.drag-over::after { opacity: 1; }
+  .insert-gap.drag-over {
+    height: 14px;
+  }
+
+  /* Drag-and-drop reorder */
+  .slide-row { user-select: none; }
+  .slide-row.dragging {
+    opacity: .35;
+    cursor: grabbing;
+  }
+  .sidebar.dragging .insert-gap { height: 14px; }
+  .sidebar.dragging .insert-gap::before { opacity: .3; }
   .slide-row:hover { background: rgba(245,239,225,0.03); }
   .slide-row.active {
     background: rgba(232,201,139,0.08);
@@ -860,13 +874,34 @@ const sideCount = document.getElementById("sideCount");
 function makeInsertGap(insertAt) {
   const gap = document.createElement("div");
   gap.className = "insert-gap";
-  gap.title = "Shto sllajd këtu";
+  gap.title = "Shto sllajd këtu (klik) ose lësho sllajdin këtu (drag)";
+  gap.dataset.insertAt = String(insertAt);
   gap.addEventListener("click", (e) => {
     e.stopPropagation();
     insertSlideAt(insertAt);
   });
+
+  // Drop target for drag-reorder
+  gap.addEventListener("dragover", (e) => {
+    if (dragFrom === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    gap.classList.add("drag-over");
+  });
+  gap.addEventListener("dragleave", () => {
+    gap.classList.remove("drag-over");
+  });
+  gap.addEventListener("drop", (e) => {
+    e.preventDefault();
+    gap.classList.remove("drag-over");
+    if (dragFrom === null) return;
+    moveSlide(dragFrom, insertAt);
+  });
   return gap;
 }
+
+// Index of the slide currently being dragged (null when not dragging).
+let dragFrom = null;
 
 function renderSidebar() {
   // Clear, then rebuild
@@ -885,6 +920,22 @@ function renderSidebar() {
       row.classList.add("section-row");
     }
     row.dataset.index = i;
+    row.draggable = true;
+    row.addEventListener("dragstart", (e) => {
+      dragFrom = i;
+      row.classList.add("dragging");
+      sidebar.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      // Firefox requires *some* data to start the drag.
+      try { e.dataTransfer.setData("text/plain", String(i)); } catch {}
+    });
+    row.addEventListener("dragend", () => {
+      dragFrom = null;
+      row.classList.remove("dragging");
+      sidebar.classList.remove("dragging");
+      [...sidebar.querySelectorAll(".insert-gap.drag-over")]
+        .forEach(g => g.classList.remove("drag-over"));
+    });
 
     const idx = document.createElement("div");
     idx.className = "idx";
@@ -904,6 +955,10 @@ function renderSidebar() {
 
     const actions = document.createElement("div");
     actions.className = "row-actions";
+    actions.draggable = false;
+    // Prevent the drag from starting when the user grabs an action button —
+    // otherwise the row would drag and the click never fires.
+    actions.addEventListener("mousedown", (e) => e.stopPropagation());
 
     const dup = document.createElement("button");
     dup.className = "row-btn dup";
@@ -963,6 +1018,24 @@ function insertSlideAt(i) {
   const at = Math.max(0, Math.min(i, slides.length));
   slides.splice(at, 0, blankTopicSlide());
   current = at;
+  markDirty();
+  renderSidebar();
+  renderEditor();
+}
+
+function moveSlide(from, to) {
+  if (from < 0 || from >= slides.length) return;
+  // No-op: dropped into the gap right above or right below itself.
+  if (to === from || to === from + 1) return;
+
+  const [item] = slides.splice(from, 1);
+  // Adjust target if we removed something earlier in the array.
+  const insertAt = from < to ? to - 1 : to;
+  slides.splice(insertAt, 0, item);
+
+  // Track the moved slide as the new selection.
+  current = insertAt;
+
   markDirty();
   renderSidebar();
   renderEditor();
