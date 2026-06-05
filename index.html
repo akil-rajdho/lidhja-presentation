@@ -921,8 +921,6 @@
           <span style="opacity:.4;margin:0 .5rem">·</span>
           <span data-lang="both" class="active">BOTH</span>
         </div>
-        <a class="btn" href="editor.html" target="_blank" title="Editori i sllajdeve">EDIT</a>
-        <button id="btnHelp" title="Ndihmë / Help">?</button>
       </div>
 
       <div class="footer-bar">
@@ -1471,7 +1469,6 @@ document.getElementById("langPill").addEventListener("click", cycleLang);
 function toggleHelp() {
   document.getElementById("helpOverlay").classList.toggle("open");
 }
-document.getElementById("btnHelp").addEventListener("click", toggleHelp);
 document.getElementById("helpClose").addEventListener("click", () => {
   document.getElementById("helpOverlay").classList.remove("open");
 });
